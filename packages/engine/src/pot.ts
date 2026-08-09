@@ -36,7 +36,11 @@ export function buildPotGeometry(
 ): LatheGeometry {
   const points = sampled.points.map((p) => new Vector2(p.radius, p.height));
   const geometry = new LatheGeometry(points, radialSegments);
-  geometry.computeVertexNormals();
+  // NOTE: do NOT call computeVertexNormals() here. LatheGeometry already
+  // computes normals that are averaged across the wrap seam (its first and
+  // last vertex columns share positions); recomputing from face adjacency
+  // gives the seam columns one-sided normals and paints a vertical lighting
+  // line down the pot. (Found the hard way; kept as a warning.)
 
   const uv = geometry.getAttribute("uv");
   const pooling = new Float32Array(uv.count);

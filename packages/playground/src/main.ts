@@ -25,16 +25,57 @@ import {
   type PresetName,
   buildPotGeometry,
   createCeladonMaterial,
+  createCrystallineMaterial,
+  createTenmokuMaterial,
   type Atmosphere,
   firingLabel,
   newFiringSeed,
   sampleProfile,
 } from "@kiln/engine";
+
+const GLAZES = {
+  celadon: (s: FiringState) => createCeladonMaterial(s),
+  crystalline: (s: FiringState) => createCrystallineMaterial(s),
+  tenmoku: (s: FiringState) => createTenmokuMaterial(s),
+};
+type GlazeName = keyof typeof GLAZES;
+type FiringState = { atmosphere: Atmosphere; seed: number; holdMinutes: number };
 import "./style.css";
 
 async function main() {
   const app = document.querySelector<HTMLDivElement>("#app");
   if (!app) throw new Error("missing #app");
+
+  // ?debug=texture — show the raw crystalline canvas flat, for hunting seams
+  // and tuning bloom density without the 3D projection in the way.
+  if (new URLSearchParams(location.search).get("debug") === "texture") {
+    const { crystallineTexture } = await import("@kiln/engine");
+    const q = new URLSearchParams(location.search);
+    const tex = crystallineTexture({
+      seed: Number(q.get("seed") ?? 417),
+      atmosphere: (q.get("atmosphere") ?? "reduction") as Atmosphere,
+      holdMinutes: Number(q.get("hold") ?? 75),
+    });
+    // The engine prefers OffscreenCanvas, which isn't a DOM element — blit it
+    // onto a visible canvas to inspect it.
+    const source = tex.image as OffscreenCanvas | HTMLCanvasElement;
+    const view = document.createElement("canvas");
+    view.width = source.width;
+    view.height = source.height;
+    const ctx2d = view.getContext("2d")!;
+    // ?debug=texture&shift=1 draws the texture rolled by half its width, so
+    // the wrap seam lands in the middle of the view — if the pattern breaks
+    // along the vertical centerline, the texture does not tile.
+    if (q.get("shift")) {
+      ctx2d.drawImage(source, -source.width / 2, 0);
+      ctx2d.drawImage(source, source.width / 2, 0);
+    } else {
+      ctx2d.drawImage(source, 0, 0);
+    }
+    view.style.cssText = "width:100vmin;height:100vmin;display:block;margin:auto";
+    app.appendChild(view);
+    return;
+  }
 
   // ---------- renderer ----------
   const renderer = new WebGPURenderer({ antialias: true });
@@ -74,11 +115,27 @@ async function main() {
   scene.add(ground);
 
   // ---------- the pot ----------
+  // Every firing is shareable: the full state lives in the URL, so a link
+  // reproduces the exact pot (the seed makes the randomness replayable).
+  const params = new URLSearchParams(location.search);
   const state = {
-    preset: "vase" as PresetName,
-    atmosphere: "reduction" as Atmosphere,
-    seed: newFiringSeed(),
+    preset: (params.get("form") ?? "vase") as PresetName,
+    glaze: (params.get("glaze") ?? "celadon") as GlazeName,
+    atmosphere: (params.get("atmosphere") ?? "reduction") as Atmosphere,
+    holdMinutes: Number(params.get("hold") ?? 45),
+    seed: Number(params.get("seed") ?? newFiringSeed()),
   };
+
+  function syncUrl() {
+    const q = new URLSearchParams({
+      form: state.preset,
+      glaze: state.glaze,
+      atmosphere: state.atmosphere,
+      hold: String(state.holdMinutes),
+      seed: String(state.seed),
+    });
+    history.replaceState(null, "", `?${q}`);
+  }
 
   let pot: Mesh | null = null;
 
@@ -91,7 +148,7 @@ async function main() {
     if (!profile) throw new Error(`unknown preset: ${state.preset}`);
     const sampled = sampleProfile(profile);
     const geometry = buildPotGeometry(sampled);
-    const material = createCeladonMaterial({ atmosphere: state.atmosphere, seed: state.seed });
+    const material = GLAZES[state.glaze](state);
     pot = new Mesh(geometry, material);
     pot.castShadow = pot.receiveShadow = true;
     scene.add(pot);
@@ -101,6 +158,7 @@ async function main() {
     controls.target.set(0, midY, 0);
 
     seedEl.textContent = firingLabel(state.seed);
+    syncUrl();
   }
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -118,11 +176,18 @@ async function main() {
         .map((n) => `<option value="${n}" ${n === state.preset ? "selected" : ""}>${n}</option>`)
         .join("")}</select>
     </label>
+    <label>glaze
+      <select id="glaze">${Object.keys(GLAZES)
+        .map((n) => `<option value="${n}" ${n === state.glaze ? "selected" : ""}>${n}</option>`)
+        .join("")}</select>
+    </label>
     <label>atmosphere
-      <select id="atmosphere">
-        <option value="reduction" selected>reduction</option>
-        <option value="oxidation">oxidation</option>
-      </select>
+      <select id="atmosphere">${(["reduction", "oxidation"] as const)
+        .map((a) => `<option value="${a}" ${a === state.atmosphere ? "selected" : ""}>${a}</option>`)
+        .join("")}</select>
+    </label>
+    <label>hold at peak <span id="holdLabel">${state.holdMinutes} min</span>
+      <input id="hold" type="range" min="10" max="90" step="5" value="${state.holdMinutes}" />
     </label>
     <button id="fire">FIRE</button>
     <p class="seed">firing <span id="seed"></span></p>
@@ -134,8 +199,18 @@ async function main() {
     state.preset = (e.target as HTMLSelectElement).value as PresetName;
     firePot();
   });
+  panel.querySelector<HTMLSelectElement>("#glaze")!.addEventListener("change", (e) => {
+    state.glaze = (e.target as HTMLSelectElement).value as GlazeName;
+    firePot();
+  });
   panel.querySelector<HTMLSelectElement>("#atmosphere")!.addEventListener("change", (e) => {
     state.atmosphere = (e.target as HTMLSelectElement).value as Atmosphere;
+    firePot();
+  });
+  const holdLabel = panel.querySelector<HTMLSpanElement>("#holdLabel")!;
+  panel.querySelector<HTMLInputElement>("#hold")!.addEventListener("input", (e) => {
+    state.holdMinutes = Number((e.target as HTMLInputElement).value);
+    holdLabel.textContent = `${state.holdMinutes} min`;
     firePot();
   });
   panel.querySelector<HTMLButtonElement>("#fire")!.addEventListener("click", () => {

@@ -67,3 +67,38 @@ same iron oxide fires jade-green in reduction, honey-amber in oxidation.
 
 **Milestone: first light.** Vase preset rendered with visible pooling at the neck groove
 on the first run — profile math → vertex attribute → TSL shader, end to end.
+
+## 5. Crystalline + tenmoku: patterns are textures, not per-pixel math
+
+Celadon is pure per-pixel math, but spherulites and oil spots are *patterns* — so they're
+synthesized on a 2D canvas at firing time from the firing's seeded RNG, then sampled by
+the material. No image files anywhere; every pattern grows from the seed.
+
+- **Crystalline**: seed scatters nucleation sites; hold-time at the growth temperature
+  sets bloom radius (saturating — real diffusion kinetics); each spherulite = two layers
+  of tapered needle strokes + a glassy halo (crystals rob surrounding glaze of colorant)
+  + a bright nucleus. 2048² canvas.
+- **Tenmoku**: base color is math (iron black breaking to rust where pooling is negative
+  — ridges and rim); oil spots are a seeded texture biased toward the top (bubbles rise),
+  blended by alpha.
+
+## 6. Three bugs, one night — all writeup material
+
+1. **Moiré rings**: 900 hard 1px mottle dots aliased under minification on the curved
+   wall. Fix: soft radial-gradient patches + anisotropic filtering + 2048² texture.
+2. **Un-solving the library's solved problem**: called `computeVertexNormals()` on a
+   `LatheGeometry`, overwriting its seam-averaged normals with one-sided ones → vertical
+   lighting line. The library was right; the "cleanup" call was the bug.
+3. **The wrap-seam purity bug** (the good one): blooms near the texture's left/right
+   edge are drawn 2–3 times (wrapped copies) for seam continuity — but the draw function
+   called `rand()` internally, so each copy drew *different needles*, painting a hard
+   break along the seam. Diagnosed with a debug view that rolls the texture by half its
+   width so the seam lands center-screen. **Rule: a tiling texture must be a pure
+   function of a precomputed plan; randomness inside the draw call breaks wrapping.**
+
+## 7. Shareable firings
+
+The playground keeps full state in the URL (`?form=bottle&glaze=crystalline&
+atmosphere=reduction&hold=75&seed=417`) — a link reproduces the exact pot, because the
+seed replays the randomness. Also the test harness: headless-Chrome screenshots of any
+state without UI automation.

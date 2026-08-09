@@ -91,3 +91,16 @@ body,
   letter-spacing: 0.14em;
   color: #a1927f;
 }
+
+.panel input[type="range"] {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  accent-color: #b0492e;
+}
+
+.panel #holdLabel {
+  float: right;
+  text-transform: none;
+  color: #a1927f;
+}

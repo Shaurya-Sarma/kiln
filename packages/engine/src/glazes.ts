@@ -11,9 +11,10 @@
  * file and nowhere else.
  */
 
-import { Color } from "three";
+import { Color, DoubleSide } from "three";
 import { MeshPhysicalNodeMaterial } from "three/webgpu";
-import { attribute, color, float, mix, smoothstep, uv } from "three/tsl";
+import { attribute, color, float, mix, smoothstep, texture, uv } from "three/tsl";
+import { crystallineTexture, oilSpotTexture } from "./textures.js";
 
 export type Atmosphere = "oxidation" | "reduction";
 
@@ -22,6 +23,11 @@ export type GlazeParams = {
   atmosphere: Atmosphere;
   /** This firing's seed — same seed, same pot. */
   seed: number;
+};
+
+export type FiringParams = GlazeParams & {
+  /** Minutes held at the crystal-growth temperature (crystalline glazes). */
+  holdMinutes: number;
 };
 
 /**
@@ -45,6 +51,9 @@ export function createCeladonMaterial({ atmosphere }: GlazeParams): MeshPhysical
       : { thin: new Color("#e3d3ae"), pooled: new Color("#a67c2e") };
 
   const material = new MeshPhysicalNodeMaterial();
+  // Lathe walls have no thickness (a deliberate scope cut) — render both faces
+  // so open forms like bowls show their inside.
+  material.side = DoubleSide;
 
   const pooling = attribute("aPooling", "float");
   const v = uv().y; // arc length up the wall: 0 = foot, 1 = rim
@@ -60,6 +69,76 @@ export function createCeladonMaterial({ atmosphere }: GlazeParams): MeshPhysical
   material.roughness = 0.18;
   material.clearcoat = 1.0;
   material.clearcoatRoughness = 0.25;
+
+  return material;
+}
+
+/**
+ * Crystalline.
+ *
+ * Zinc-silicate glazes that grow visible flower-shaped crystals
+ * ("spherulites"). The structure of the simulation mirrors the real physics:
+ * the SEED decides where crystals nucleate, the firing's HOLD TIME decides how
+ * big they grow (published kinetics: growth happens only while the kiln holds
+ * in the growth-temperature window). The spherulite constellation is
+ * synthesized as a seeded texture (textures.ts); the material samples it and
+ * adds glassy depth on top.
+ */
+export function createCrystallineMaterial(params: FiringParams): MeshPhysicalNodeMaterial {
+  const material = new MeshPhysicalNodeMaterial();
+  // Lathe walls have no thickness (a deliberate scope cut) — render both faces
+  // so open forms like bowls show their inside.
+  material.side = DoubleSide;
+
+  const blooms = texture(crystallineTexture(params));
+
+  // Slight darkening where the glaze pools — crystalline glazes are runny
+  // glass too, and the pooled edge grounds the pot visually.
+  const pooling = attribute("aPooling", "float").max(0).mul(0.25);
+  material.colorNode = mix(blooms.rgb, blooms.rgb.mul(0.72), pooling);
+
+  // Crystals sit in a very fluid, high-gloss glaze.
+  material.roughness = 0.12;
+  material.clearcoat = 1.0;
+  material.clearcoatRoughness = 0.15;
+
+  return material;
+}
+
+/**
+ * Tenmoku.
+ *
+ * The iron-saturated near-black of Song-dynasty tea bowls. Two signatures:
+ * it "breaks" to rust where the glaze runs thin (rims and ridges — exactly
+ * where our pooling attribute goes NEGATIVE), and "oil spots" — silvery
+ * freckles left where oxygen bubbles dragged iron to the surface. Breaking is
+ * pure geometry math; the spots are a seeded texture blended by its alpha.
+ */
+export function createTenmokuMaterial({ atmosphere, seed }: GlazeParams): MeshPhysicalNodeMaterial {
+  const material = new MeshPhysicalNodeMaterial();
+  // Lathe walls have no thickness (a deliberate scope cut) — render both faces
+  // so open forms like bowls show their inside.
+  material.side = DoubleSide;
+
+  const iron = new Color("#1d1410");
+  const rust = atmosphere === "reduction" ? new Color("#8a4a24") : new Color("#a2551d");
+
+  const pooling = attribute("aPooling", "float");
+  const v = uv().y;
+
+  // Thin glaze = ridges (negative pooling) + the rim itself. Both break to rust.
+  const ridges = pooling.min(0).negate().mul(1.4);
+  const rim = smoothstep(float(0.82), float(1.0), v).mul(0.9);
+  const breaking = ridges.add(rim).clamp(0, 1);
+
+  const base = mix(color(iron), color(rust), breaking);
+
+  const spots = texture(oilSpotTexture({ seed }));
+  material.colorNode = mix(base, spots.rgb, spots.a);
+
+  material.roughness = 0.3;
+  material.clearcoat = 0.9;
+  material.clearcoatRoughness = 0.35;
 
   return material;
 }
