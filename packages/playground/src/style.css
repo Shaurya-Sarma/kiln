@@ -1,0 +1,93 @@
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+  background: #f4f1ec;
+}
+
+#app {
+  position: relative;
+}
+
+#app canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.panel {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  width: 180px;
+  padding: 20px 22px;
+  background: rgba(255, 253, 249, 0.82);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(107, 93, 79, 0.18);
+  border-radius: 4px;
+  color: #4a4036;
+}
+
+.panel h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0.45em;
+}
+
+.panel .tagline {
+  margin: 4px 0 18px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: #a1927f;
+}
+
+.panel label {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6b5d4f;
+}
+
+.panel select {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #4a4036;
+  background: #fffdf9;
+  border: 1px solid rgba(107, 93, 79, 0.3);
+  border-radius: 3px;
+}
+
+.panel button {
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 0;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.35em;
+  color: #fffdf9;
+  background: #b0492e; /* kiln-brick red */
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.panel button:hover {
+  background: #93381f;
+}
+
+.panel .seed {
+  margin: 14px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: #a1927f;
+}
