@@ -104,6 +104,7 @@ const GLAZE_NOTES: Record<GlazeName, string> = {
 async function main() {
   const app = document.querySelector<HTMLDivElement>("#app");
   if (!app) throw new Error("missing #app");
+  const preheat = document.querySelector("#preheat");
 
   // ?debug=cursor — the cursor contact sheet: every follower state pinned out as
   // artwork, because a screenshot cannot photograph a cursor. It has to return
@@ -111,6 +112,7 @@ async function main() {
   // behind `await renderer.init()` made it unreachable on any machine without
   // WebGPU (headless Chrome included), where that promise simply never settles.
   if (new URLSearchParams(location.search).get("debug") === "cursor") {
+    preheat?.remove();
     initCursor();
     return;
   }
@@ -119,6 +121,7 @@ async function main() {
   // to trigger it, plus a spin-rate slider for the continuous wheel loop. You
   // cannot hear a screenshot, so this is how the sound design gets checked.
   if (new URLSearchParams(location.search).get("debug") === "sound") {
+    preheat?.remove();
     const { mountSoundBoard } = await import("./sound-board.js");
     mountSoundBoard(app);
     return;
@@ -150,6 +153,7 @@ async function main() {
       ctx2d.drawImage(source, 0, 0);
     }
     view.style.cssText = "width:100vmin;height:100vmin;display:block;margin:auto";
+    preheat?.remove();
     app.appendChild(view);
     return;
   }
@@ -180,6 +184,7 @@ async function main() {
   // ---------- renderer: TRANSPARENT so DOM typography sits behind the 3D ----------
   const renderer = new WebGPURenderer({ antialias: true, alpha: true });
   await renderer.init();
+  preheat?.remove(); // the kiln is hot — from here the scene takes over
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFSoftShadowMap;
@@ -491,6 +496,10 @@ async function main() {
     </div>
     <button class="share" id="share">copy link to this firing</button>
     <button class="share soundtoggle" id="soundToggle">sound ${soundEnabled() ? "on" : "off"}</button>
+    <p class="credit">
+      made by <a href="https://shaux.dev" target="_blank" rel="noopener">shaurya sarma</a>
+      · <a href="https://github.com/Shaurya-Sarma" target="_blank" rel="noopener">github</a>
+    </p>
     <div class="shelf" id="shelf">
       <p class="shelf-label">THE SHELF</p>
       <div class="shelf-items" id="shelfItems"></div>
@@ -515,7 +524,12 @@ async function main() {
     localStorage.setItem("kiln.panel.v1", collapsed ? "min" : "open");
   };
   panelToggle.addEventListener("click", () => setPanelCollapsed(!panelEl.classList.contains("collapsed")));
-  if (localStorage.getItem("kiln.panel.v1") === "min") setPanelCollapsed(true);
+  const storedPanel = localStorage.getItem("kiln.panel.v1");
+  // Phones start folded: the card would otherwise stand in front of the pot,
+  // and the pot is the point. A stored preference still wins.
+  if (storedPanel === "min" || (storedPanel === null && matchMedia("(max-width: 720px)").matches)) {
+    setPanelCollapsed(true);
+  }
 
   const seedEl = chrome.querySelector<HTMLSpanElement>("#seed")!;
   const bignumEl = chrome.querySelector<HTMLDivElement>("#bignum")!;
@@ -674,6 +688,9 @@ async function main() {
   function resize() {
     const { clientWidth: w, clientHeight: h } = app!;
     camera.aspect = w / h;
+    // A portrait phone crops the pot at the default focal length — widen the
+    // field of view as the viewport narrows (the dolly-free way to step back).
+    camera.fov = camera.aspect < 0.7 ? 47 : camera.aspect < 1 ? 41 : 35;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
   }

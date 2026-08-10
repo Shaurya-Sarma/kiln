@@ -9,12 +9,26 @@
       content="Draw a vessel profile, glaze it with procedural shaders, and fire it on a schedule you draw yourself. The kiln gets the final say."
     />
     <!-- The mark: a hand-cut vase, cream on kiln-brown (see public/favicon.svg). -->
+    <meta property="og:title" content="Kiln — throw, glaze, and fire pottery in the browser" />
+    <meta
+      property="og:description"
+      content="Pick a form, mix a glaze, draw a firing schedule — the kiln gets the final say. Every firing is different; keep the good ones on the shelf."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://kiln.shaux.dev/" />
+    <meta property="og:image" content="https://kiln.shaux.dev/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://kiln.shaux.dev/og.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#6F4930" />
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- Removed by main() the moment the renderer is ready. Styled inline:
+           it must render before any bundle (fonts included) has loaded. -->
+      <p id="preheat" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);margin:0;font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#a1927f">preheating the kiln&hellip;</p>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

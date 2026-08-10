@@ -384,6 +384,29 @@ body,
   padding-bottom: 4px;
   /* the shelf plank */
   border-bottom: 3px solid rgba(107, 93, 79, 0.4);
+  /* A full shelf scrolls sideways — and LOOKS like it does: a slim clay-toned
+     scrollbar instead of the invisible default, and snap so pots settle at
+     tidy stops rather than half off the plank. */
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-faint) transparent;
+}
+
+.shelf-items::-webkit-scrollbar {
+  height: 5px;
+}
+
+.shelf-items::-webkit-scrollbar-thumb {
+  background: var(--ink-faint);
+  border-radius: 3px;
+}
+
+.shelf-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shelf-item {
+  scroll-snap-align: start;
 }
 
 .shelf-item {
@@ -627,4 +650,127 @@ body,
   margin-bottom: 0;
   border-bottom: none;
   padding-bottom: 0;
+}
+
+/* ---------- attribution ---------- */
+.credit {
+  position: absolute;
+  right: 38px;
+  bottom: 8px;
+  z-index: 20;
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.credit a {
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.credit a:hover {
+  color: var(--brick);
+  text-decoration: underline wavy 1px;
+  text-underline-offset: 3px;
+}
+
+/* ---------- the phone pass ----------
+   Not a redesign: the same exhibit, condensed. Recruiters open links on
+   phones; the pot must stand, the FIRE button must work, nothing may
+   overlap into soup. The cursor system already sits out (pointer: coarse). */
+@media (max-width: 720px) {
+  .tick {
+    display: none;
+  }
+
+  .masthead {
+    top: 14px;
+    left: 16px;
+  }
+
+  .masthead h1 {
+    font-size: 26px;
+    gap: 8px;
+  }
+
+  .masthead .mark {
+    width: 22px;
+    height: 22px;
+  }
+
+  .panel {
+    top: 56px;
+    left: 16px;
+    width: 158px;
+    padding: 12px 14px 14px;
+  }
+
+  .panel label {
+    margin-bottom: 9px;
+  }
+
+  .glaze-note {
+    display: none; /* teaching copy is a desktop luxury at this size */
+  }
+
+  .bignum {
+    font-size: 44vw;
+    top: 10%;
+  }
+
+  /* Right-edge utilities stack in the top-right corner, out of the pot's way. */
+  .share {
+    right: 16px;
+    bottom: auto;
+    top: 16px;
+  }
+
+  .share.cleartable {
+    top: 36px;
+    bottom: auto;
+  }
+
+  .share.soundtoggle {
+    top: 56px;
+    bottom: auto;
+  }
+
+  .credit {
+    right: 12px;
+    bottom: 4px;
+    font-size: 8px;
+    letter-spacing: 0.08em;
+  }
+
+  .share,
+  .share.cleartable,
+  .share.soundtoggle {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+
+  .placard {
+    bottom: 10px;
+    min-width: 0;
+    width: auto;
+    max-width: 92vw;
+    padding: 8px 12px 9px;
+  }
+
+  .placard-meta {
+    white-space: normal; /* nowrap would overflow a phone; here it may fold */
+  }
+
+  .placard-title {
+    font-size: 14px;
+  }
+
+  .shelf {
+    left: 16px;
+    bottom: 106px;
+    max-width: calc(100vw - 32px);
+  }
 }
