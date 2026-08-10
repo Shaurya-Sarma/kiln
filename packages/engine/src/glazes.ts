@@ -179,11 +179,20 @@ export function createCeladonMaterial({ atmosphere, seed, holdMinutes, colorant 
   // on the DEFAULT glaze produced an identical pot — the thesis, broken
   // exactly where a first-time visitor tests it.
   const kiln = mulberry32(seed ^ 0xce1ad);
-  const drift = (kiln() - 0.5) * 0.4; // warmer or cooler corner of the kiln
+  const drift = (kiln() - 0.5) * 0.7; // warmer or cooler corner of the kiln
+  // BOTH ends of the palette drift, not just the pooled tone: on a mostly-thin
+  // wall the pale body is nearly all you see, and if it doesn't move between
+  // firings, nine test tiles read as one pot (a real 3x3 proved it).
   const palette =
     atmosphere === "reduction"
-      ? { thin: new Color("#dee7dc"), pooled: new Color("#2f6d55").lerp(new Color("#2f5d75"), drift + 0.11) }
-      : { thin: new Color("#eee0be"), pooled: new Color("#8c6320").lerp(new Color("#a4491f"), drift + 0.11) };
+      ? {
+          thin: new Color("#dee7dc").lerp(new Color("#cfe0e4"), drift + 0.35),
+          pooled: new Color("#2f6d55").lerp(new Color("#2f5d75"), drift + 0.35),
+        }
+      : {
+          thin: new Color("#eee0be").lerp(new Color("#ecd2a4"), drift + 0.35),
+          pooled: new Color("#8c6320").lerp(new Color("#a4491f"), drift + 0.35),
+        };
   // Iron speckle in the stoneware body, visible only through thin glaze.
   const clayBody = new Color("#8d7357");
 
@@ -207,7 +216,7 @@ export function createCeladonMaterial({ atmosphere, seed, holdMinutes, colorant 
   // (this firing's coat is scaled by the seed), plus broad soft patches where
   // the dip ran thick, plus wherever gravity pooled it. Then stretch by the
   // viewing angle and let the melt absorb along that path.
-  const APPLIED_COAT = 0.52 * (0.82 + kiln() * 0.4);
+  const APPLIED_COAT = 0.52 * (0.7 + kiln() * 0.65);
   const dipPatches = surfaceNoise(2.2, 6, kiln() * 73).sub(0.5).mul(0.85);
   // A longer soak runs the melt: pooling deepens with hold maturity.
   const thickness = poolAmount.mul(1.1 + melt * 0.9).add(APPLIED_COAT).add(dipPatches).max(0.12).mul(viewPathMultiplier());

@@ -246,3 +246,22 @@ Three new glazes, chosen specifically for per-firing variance:
 - **Ash** — gravity made visible: seeded rivulets planned as full wander paths (purity
   rule), stamped as overlapping discs. 26 steps read as a dotted line — no melted glass
   ever dripped dotted; 72 steps overlap into runs.
+
+## 13. The last stretch: honest controls, oxides, and shipping
+
+- **Hold-at-peak matured only crystalline** — a control that lied for five of six
+  glazes. A soak matures every melt: celadon pools deeper, blushes spread, veils
+  stretch, drips travel, bubbles merge into larger oil spots. GlazeParams carries
+  holdMinutes everywhere now.
+- **Colorant**: the pottery-honest way to change a glaze's colour is to swap the metal
+  oxide. iron/cobalt/chrome/manganese/rutile as a hue+saturation wrap on each glaze's
+  final colour node — and the same table exported as `colorantTint()` so shelf sketches
+  can never disagree with the shader about what cobalt means.
+- **The cursor saga**: a chunky-arrow follower with sparkle/ripple accents and a real
+  state machine. Lesson that earned a commit of its own: a cursor mode must be
+  UNBEATABLE BY CONSTRUCTION (`!important` tier) — per-element `cursor:` declarations
+  restarted the same specificity fight three times in one night.
+- **Ship prep**: phone pass (same exhibit, condensed; card starts folded; fov widens on
+  narrow aspects), og card, synthesized "preheating the kiln…" boot line, five-pot
+  shelf cap with visible scroll. Deployed to kiln.shaux.dev (Vercel prebuilt flow);
+  repo public at github.com/Shaurya-Sarma/kiln.
