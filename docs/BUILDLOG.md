@@ -135,3 +135,24 @@ separately-built programs honest with each other.
 - **Typing war story**: the UI typecheck (which compiles the engine too) caught TSL
   errors Vite never surfaced — `attribute()`'s typings widen the node type to `string`.
   Fix: pin the generic (`attribute<"float">("aPooling", "float")`).
+
+## 9. Design pass: "a potter's studio notebook in a gallery"
+
+Synthesized from five reference sites (noartmusic, namaha.healthcare,
+estelle-jozwicki, valeran.eu, serotoninn), in the builder's preference order:
+
+- From **noart**: the hand×technical tension — a soft serif voice against a workshop
+  monospace (labels, values, firing numbers), plus crop-mark corner ticks.
+- From **namaha/estelle**: gallery warmth — the pot as the exhibit, calm whitespace,
+  serif italic microcopy ("the kiln decides").
+- From **valeran**: the firing moment — on FIRE the gallery dims to kiln-dark, embers
+  rise from the bottom edge, and the new pot appears before light floods back
+  (you can't watch a firing; you wait outside the kiln).
+- From **serotoninn**: the controls as a **glaze recipe card** — dashed border, stamped
+  mono values, offset paper shadow.
+
+System: Fraunces Variable (SOFT/WONK axes — an old-style serif designed to feel warm
+and slightly imperfect) + IBM Plex Mono; warm paper, clay-ink brown (never pure black),
+kiln-brick red; SVG-turbulence paper grain over everything. Fonts self-hosted via
+Fontsource — no CDN, which also keeps them working inside the plugin's null-origin
+iframe. Glyph gotcha: Plex Mono lacks "№" (U+2116) — firing labels use "no." instead.

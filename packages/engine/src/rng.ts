@@ -32,7 +32,8 @@ export function newFiringSeed(): number {
   return Math.floor(Math.random() * 0xffffffff);
 }
 
-/** Kiln-load label for a seed, e.g. "№ 0417" — potters number their firings. */
+/** Kiln-load label for a seed, e.g. "no. 0417" — potters number their firings.
+ * ("no." not "№": U+2116 is missing from IBM Plex Mono, our label face.) */
 export function firingLabel(seed: number): string {
-  return `№ ${String(seed % 10000).padStart(4, "0")}`;
+  return `no. ${String(seed % 10000).padStart(4, "0")}`;
 }
