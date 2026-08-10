@@ -148,7 +148,12 @@ function sendProfile() {
     type: "profile",
     points: found?.points ?? null,
     sourceName: found?.name ?? null,
-    restore: figma.command === "refire" ? restoreFromSelection() : null,
+    // Selecting a placed pot and running Kiln restores it — no relaunch
+    // button required (Figma's UI3 doesn't reliably surface relaunch data,
+    // and "select the thing, open the tool" is the gesture people try
+    // first anyway). restoreFromSelection() is null for non-Kiln nodes,
+    // and a selected pen curve (`found`) still wins below.
+    restore: found ? null : restoreFromSelection(),
     // Launched via the "Test tiles ×9" menu entry: the UI fires the grid
     // immediately instead of waiting for a button press.
     autorun: figma.command === "tiles" ? "tiles" : null,
