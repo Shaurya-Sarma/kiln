@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!--
+    Kiln's mark: a hand-cut vase silhouette, cream on kiln-brown.
+    The paper-cut wonk is deliberate — every segment is straight and slightly
+    off, like scissors through cream paper. No curves anywhere: at 16px a
+    smooth vase reads as a blob, but cut edges keep their character.
+  -->
+  <rect width="64" height="64" rx="14" fill="#6F4930"/>
+  <path
+    fill="#F4EAD5"
+    d="M 25 11
+       L 40 10
+       L 38 15
+       L 37 20
+       L 45 26
+       L 48 35
+       L 44 47
+       L 40 51
+       L 42 56
+       L 23 57
+       L 26 51
+       L 21 46
+       L 16 34
+       L 20 25
+       L 27 19
+       L 26 14
+       Z"/>
+</svg>
