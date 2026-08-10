@@ -223,6 +223,8 @@ function drawSpherulite(
 
 export type OilSpotParams = {
   seed: number;
+  /** Soak minutes: bubbles merge during a long hold — fewer, larger spots. */
+  holdMinutes: number;
 };
 
 /**
@@ -232,19 +234,21 @@ export type OilSpotParams = {
  * denser on the upper body (bubbles rise), on a transparent canvas that the
  * tenmoku material blends over its base color.
  */
-export function oilSpotTexture({ seed }: OilSpotParams): CanvasTexture {
+export function oilSpotTexture({ seed, holdMinutes }: OilSpotParams): CanvasTexture {
   const SIZE = 1024;
   const { canvas, ctx } = makeCanvas(SIZE);
   const rand = mulberry32(seed ^ 0x9e3779b9); // decorrelate from other users of the seed
 
-  const count = 380 + Math.floor(rand() * 160);
+  // Long soak: bubbles find each other and merge — fewer spots, each larger.
+  const melt = Math.min(holdMinutes / 90, 1);
+  const count = Math.round((380 + Math.floor(rand() * 160)) * (1.15 - melt * 0.55));
   for (let i = 0; i < count; i++) {
     // Plan before drawing — wrapX may stamp a spot twice for seam continuity,
     // and both stamps must be identical (no rand() inside the draw callback).
     // Bias spots toward the top of the pot (v=1 is the rim; canvas y=0 is v=1).
     const y = Math.pow(rand(), 1.6) * SIZE;
     const x = rand() * SIZE;
-    const r = 1.5 + rand() * 5.5;
+    const r = (1.5 + rand() * 5.5) * (0.8 + melt * 0.7);
     const coreAlpha = 0.5 + rand() * 0.4;
     const edgeAlpha = 0.25 + rand() * 0.2;
     wrapX(SIZE, x, (sx) => {
@@ -265,6 +269,8 @@ export function oilSpotTexture({ seed }: OilSpotParams): CanvasTexture {
 export type SeededGlazeParams = {
   seed: number;
   atmosphere: Atmosphere;
+  /** Soak minutes at peak — a longer hold matures every melt (see GlazeParams). */
+  holdMinutes: number;
 };
 
 /**
@@ -277,10 +283,11 @@ export type SeededGlazeParams = {
  * SEED decides where the blushes bloom and where the carbon got trapped;
  * reduction firings trap far more carbon than oxidation ones.
  */
-export function shinoTexture({ seed, atmosphere }: SeededGlazeParams): CanvasTexture {
+export function shinoTexture({ seed, atmosphere, holdMinutes }: SeededGlazeParams): CanvasTexture {
   const SIZE = 1024;
   const { canvas, ctx } = makeCanvas(SIZE);
   const rand = mulberry32(seed ^ 0x51142);
+  const melt = Math.min(holdMinutes / 90, 1); // longer soak -> blushes spread
 
   // Base: warm feldspar cream — itself a per-firing fact. Some loads come out
   // milk-white, some toast all over; one lerp on the whole base sells that.
@@ -298,7 +305,7 @@ export function shinoTexture({ seed, atmosphere }: SeededGlazeParams): CanvasTex
   const blushes = Array.from({ length: 8 + Math.floor(rand() * 9) }, () => ({
     x: rand() * SIZE,
     y: rand() * SIZE,
-    r: SIZE * (0.12 + rand() * 0.26),
+    r: SIZE * (0.12 + rand() * 0.26) * (0.75 + melt * 0.6),
     alpha: 0.4 + rand() * 0.35,
     warm: rand(), // 0 = salmon, 1 = burnt orange
   }));
@@ -367,10 +374,11 @@ export function shinoTexture({ seed, atmosphere }: SeededGlazeParams): CanvasTex
  * different glazes from one recipe. In reduction, the seed streaks the red
  * with flambé runs — violet-blue veils where the glaze re-oxidized as it ran.
  */
-export function copperRedTexture({ seed, atmosphere }: SeededGlazeParams): CanvasTexture {
+export function copperRedTexture({ seed, atmosphere, holdMinutes }: SeededGlazeParams): CanvasTexture {
   const SIZE = 1024;
   const { canvas, ctx } = makeCanvas(SIZE);
   const rand = mulberry32(seed ^ 0xc0bbe4);
+  const melt = Math.min(holdMinutes / 90, 1); // longer soak -> veils run longer
 
   if (atmosphere === "oxidation") {
     // Copper in oxygen: a soft matte green, gently mottled.
@@ -412,7 +420,7 @@ export function copperRedTexture({ seed, atmosphere }: SeededGlazeParams): Canva
   const streaks = Array.from({ length: 7 + Math.floor(rand() * 9) }, () => ({
     x: rand() * SIZE,
     top: rand() * SIZE * 0.5,
-    length: SIZE * (0.25 + rand() * 0.5),
+    length: SIZE * (0.25 + rand() * 0.5) * (0.7 + melt * 0.65),
     width: 14 + rand() * 46,
     drift: (rand() - 0.5) * 60,
     alpha: 0.1 + rand() * 0.22,
@@ -450,10 +458,11 @@ export function copperRedTexture({ seed, atmosphere }: SeededGlazeParams): Canva
  * and gathers wherever it can rest. The drips ARE the glaze: each firing the
  * seed decides where they start, how far they wander, and where they pool.
  */
-export function ashTexture({ seed }: SeededGlazeParams): CanvasTexture {
+export function ashTexture({ seed, holdMinutes }: SeededGlazeParams): CanvasTexture {
   const SIZE = 1024;
   const { canvas, ctx } = makeCanvas(SIZE);
   const rand = mulberry32(seed ^ 0xa54);
+  const melt = Math.min(holdMinutes / 90, 1); // longer soak -> drips travel
 
   // Base: thin amber-olive wash, warmer where the coat is thin near the rim.
   const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
@@ -468,7 +477,7 @@ export function ashTexture({ seed }: SeededGlazeParams): CanvasTexture {
   const drips = Array.from({ length: 10 + Math.floor(rand() * 8) }, () => {
     const startX = rand() * SIZE;
     const startY = SIZE * (0.02 + rand() * 0.3);
-    const length = SIZE * (0.25 + rand() * 0.55);
+    const length = SIZE * (0.25 + rand() * 0.55) * (0.6 + melt * 0.8);
     // Enough steps that adjacent discs overlap into a continuous run — at 26
     // steps the discs read as a dotted line, which no melted glass ever did.
     const steps = 72;

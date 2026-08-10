@@ -69,14 +69,20 @@ import {
 import { initCursor, setPotGrip } from "./cursor.js";
 import "./style.css";
 
+// Every glaze receives the full firing — atmosphere, seed, AND hold. The
+// hold matters everywhere now (a soak matures every melt), so the factories
+// just forward the recipe's firing facts wholesale.
 const GLAZES: Record<GlazeName, (r: Recipe) => Material> = {
-  celadon: (r) => createCeladonMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
-  crystalline: (r) => createCrystallineMaterial({ atmosphere: r.atmosphere, seed: r.seed, holdMinutes: r.holdMinutes }),
-  tenmoku: (r) => createTenmokuMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
-  shino: (r) => createShinoMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
-  "copper-red": (r) => createCopperRedMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
-  ash: (r) => createAshMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
+  celadon: (r) => createCeladonMaterial(firing(r)),
+  crystalline: (r) => createCrystallineMaterial(firing(r)),
+  tenmoku: (r) => createTenmokuMaterial(firing(r)),
+  shino: (r) => createShinoMaterial(firing(r)),
+  "copper-red": (r) => createCopperRedMaterial(firing(r)),
+  ash: (r) => createAshMaterial(firing(r)),
 };
+function firing(r: Recipe) {
+  return { atmosphere: r.atmosphere, seed: r.seed, holdMinutes: r.holdMinutes };
+}
 
 /** What is happening in the melt, and what the kiln varies per firing —
  * shown under the glaze picker so the controls teach the craft they model. */

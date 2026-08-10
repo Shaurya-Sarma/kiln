@@ -584,3 +584,9 @@ body,
   border-color: var(--brick);
   color: var(--paper-raised);
 }
+
+/* The scroll container was cropping the corner badges — breathing room so
+   nothing that overhangs a thumbnail gets cut off. */
+.shelf-items {
+  padding: 10px 10px 4px 2px;
+}

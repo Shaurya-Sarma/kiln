@@ -91,12 +91,17 @@ export type GlazeParams = {
   atmosphere: Atmosphere;
   /** This firing's seed — same seed, same pot. */
   seed: number;
-};
-
-export type FiringParams = GlazeParams & {
-  /** Minutes held at the crystal-growth temperature (crystalline glazes). */
+  /**
+   * Minutes soaked at peak temperature. Crystals grow with it — but so does
+   * everything else: a longer soak matures every melt, so glazes run further,
+   * pool deeper, blush wider. Every material consumes this; a control that
+   * only worked on one glaze out of six was a control that lied.
+   */
   holdMinutes: number;
 };
+
+/** @deprecated alias kept for the plugin's imports — same shape now. */
+export type FiringParams = GlazeParams;
 
 /**
  * Celadon.
@@ -116,14 +121,15 @@ export type FiringParams = GlazeParams & {
  * `mix(thin, pooled, pooling)` was missing, and it is most of the difference
  * between "pale green plastic" and "glass with something dissolved in it".
  */
-export function createCeladonMaterial({ atmosphere, seed }: GlazeParams): MeshPhysicalNodeMaterial {
+export function createCeladonMaterial({ atmosphere, seed, holdMinutes }: GlazeParams): MeshPhysicalNodeMaterial {
+  const melt = Math.min(holdMinutes / 90, 1); // soak maturity, 0..1
   // The seed is the kiln's fingerprint, and celadon must carry it too: dip
   // thickness varies (nobody dips identically twice), speckles land elsewhere,
   // and the fired hue drifts with kiln position. Without this, "fire again"
   // on the DEFAULT glaze produced an identical pot — the thesis, broken
   // exactly where a first-time visitor tests it.
   const kiln = mulberry32(seed ^ 0xce1ad);
-  const drift = (kiln() - 0.5) * 0.22; // warmer or cooler corner of the kiln
+  const drift = (kiln() - 0.5) * 0.4; // warmer or cooler corner of the kiln
   const palette =
     atmosphere === "reduction"
       ? { thin: new Color("#dee7dc"), pooled: new Color("#2f6d55").lerp(new Color("#2f5d75"), drift + 0.11) }
@@ -152,8 +158,9 @@ export function createCeladonMaterial({ atmosphere, seed }: GlazeParams): MeshPh
   // the dip ran thick, plus wherever gravity pooled it. Then stretch by the
   // viewing angle and let the melt absorb along that path.
   const APPLIED_COAT = 0.52 * (0.82 + kiln() * 0.4);
-  const dipPatches = surfaceNoise(2.2, 6, kiln() * 73).sub(0.5).mul(0.5);
-  const thickness = poolAmount.mul(1.5).add(APPLIED_COAT).add(dipPatches).max(0.12).mul(viewPathMultiplier());
+  const dipPatches = surfaceNoise(2.2, 6, kiln() * 73).sub(0.5).mul(0.85);
+  // A longer soak runs the melt: pooling deepens with hold maturity.
+  const thickness = poolAmount.mul(1.1 + melt * 0.9).add(APPLIED_COAT).add(dipPatches).max(0.12).mul(viewPathMultiplier());
   const depth = absorbed(thickness, 1.0);
 
   // Where the coat is thinnest, the speckled stoneware underneath shows through
@@ -226,7 +233,7 @@ export function createCrystallineMaterial(params: FiringParams): MeshPhysicalNod
  * freckles left where oxygen bubbles dragged iron to the surface. Breaking is
  * pure geometry math; the spots are a seeded texture blended by its alpha.
  */
-export function createTenmokuMaterial({ atmosphere, seed }: GlazeParams): MeshPhysicalNodeMaterial {
+export function createTenmokuMaterial({ atmosphere, seed, holdMinutes }: GlazeParams): MeshPhysicalNodeMaterial {
   const material = new MeshPhysicalNodeMaterial();
   // Lathe walls have no thickness (a deliberate scope cut) — render both faces
   // so open forms like bowls show their inside.
@@ -245,7 +252,7 @@ export function createTenmokuMaterial({ atmosphere, seed }: GlazeParams): MeshPh
 
   const base = mix(color(iron), color(rust), breaking);
 
-  const spots = texture(oilSpotTexture({ seed }));
+  const spots = texture(oilSpotTexture({ seed, holdMinutes }));
   material.colorNode = mix(base, spots.rgb, spots.a);
 
   material.roughness = 0.3;
