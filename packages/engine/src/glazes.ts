@@ -19,12 +19,14 @@ import {
   dot,
   exp,
   float,
+  hue,
   max,
   min,
   mix,
   mx_noise_float,
   oneMinus,
   positionViewDirection,
+  saturation as saturationAdjust,
   smoothstep,
   texture,
   transformedNormalView,
@@ -33,6 +35,7 @@ import {
 } from "three/tsl";
 import { ashTexture, copperRedTexture, crystallineTexture, oilSpotTexture, shinoTexture } from "./textures.js";
 import { mulberry32 } from "./rng.js";
+import type Node from "three/src/nodes/core/Node.js";
 
 /**
  * How far light travels through the glaze layer before it comes back out.
@@ -86,6 +89,35 @@ function surfaceNoise(around: number, upward: number, shift = 0) {
 
 export type Atmosphere = "oxidation" | "reduction";
 
+/**
+ * The colorant: which metal oxide is dissolved in the melt. This is how real
+ * glazes get their colour — iron gives celadon its jade and tenmoku its black,
+ * copper gives oxblood, cobalt gives every classic blue. Swapping the oxide
+ * re-colours a base glaze, and (faithfully to real ceramics) the same oxide
+ * lands differently in every base — cobalt celadon is a quiet winter blue,
+ * cobalt shino goes lavender. Test tiles exist for a reason.
+ */
+export type Colorant = "iron" | "cobalt" | "chrome" | "manganese" | "rutile";
+
+/** Hue rotation (radians) + saturation scale per oxide, applied to a glaze's
+ * final colour. Iron is the identity: every base palette was authored as its
+ * traditional iron-bearing self. */
+const COLORANT_SHIFT: Record<Colorant, { hue: number; sat: number }> = {
+  iron: { hue: 0, sat: 1 },
+  cobalt: { hue: 1.2, sat: 1.2 },
+  chrome: { hue: -0.9, sat: 1.05 },
+  manganese: { hue: 2.9, sat: 0.9 },
+  rutile: { hue: -0.35, sat: 0.8 },
+};
+
+/** Wrap a glaze's final colour in its colorant. Identity for iron — the
+ * shader graph stays untouched for the traditional recipes. */
+function withColorant(node: Node<"vec3">, colorant: Colorant): Node<"vec3"> {
+  const shift = COLORANT_SHIFT[colorant];
+  if (colorant === "iron") return node;
+  return saturationAdjust(hue(node, shift.hue), shift.sat);
+}
+
 export type GlazeParams = {
   /** Kiln atmosphere. Reduction (oxygen-starved) vs oxidation (oxygen-rich). */
   atmosphere: Atmosphere;
@@ -98,6 +130,8 @@ export type GlazeParams = {
    * only worked on one glaze out of six was a control that lied.
    */
   holdMinutes: number;
+  /** Which metal oxide colours the melt. See {@link Colorant}. */
+  colorant: Colorant;
 };
 
 /** @deprecated alias kept for the plugin's imports — same shape now. */
@@ -121,7 +155,7 @@ export type FiringParams = GlazeParams;
  * `mix(thin, pooled, pooling)` was missing, and it is most of the difference
  * between "pale green plastic" and "glass with something dissolved in it".
  */
-export function createCeladonMaterial({ atmosphere, seed, holdMinutes }: GlazeParams): MeshPhysicalNodeMaterial {
+export function createCeladonMaterial({ atmosphere, seed, holdMinutes, colorant }: GlazeParams): MeshPhysicalNodeMaterial {
   const melt = Math.min(holdMinutes / 90, 1); // soak maturity, 0..1
   // The seed is the kiln's fingerprint, and celadon must carry it too: dip
   // thickness varies (nobody dips identically twice), speckles land elsewhere,
@@ -168,7 +202,10 @@ export function createCeladonMaterial({ atmosphere, seed, holdMinutes }: GlazePa
   // and not just coloured plastic.
   const speckle = smoothstep(float(0.64), float(0.88), surfaceNoise(11, 52, kiln() * 97)).mul(oneMinus(depth)).mul(0.34);
 
-  material.colorNode = mix(mix(color(palette.thin), color(palette.pooled), depth), color(clayBody), speckle);
+  material.colorNode = withColorant(
+    mix(mix(color(palette.thin), color(palette.pooled), depth), color(clayBody), speckle),
+    colorant,
+  );
 
   // Glassy surface: glaze IS glass. Clearcoat gives the wet-looking skin.
   material.roughness = 0.18;
@@ -211,7 +248,7 @@ export function createCrystallineMaterial(params: FiringParams): MeshPhysicalNod
   // crystalline glaze gets most of its colour from the crystals themselves
   // rather than from a dissolved colourant.
   const depth = absorbed(viewPathMultiplier(), 0.42);
-  material.colorNode = mix(pooled, pooled.mul(0.62), depth.mul(0.68));
+  material.colorNode = withColorant(mix(pooled, pooled.mul(0.62), depth.mul(0.68)), params.colorant);
 
   // Crystals sit in a very fluid, high-gloss glaze.
   material.roughness = 0.12;
@@ -233,7 +270,7 @@ export function createCrystallineMaterial(params: FiringParams): MeshPhysicalNod
  * freckles left where oxygen bubbles dragged iron to the surface. Breaking is
  * pure geometry math; the spots are a seeded texture blended by its alpha.
  */
-export function createTenmokuMaterial({ atmosphere, seed, holdMinutes }: GlazeParams): MeshPhysicalNodeMaterial {
+export function createTenmokuMaterial({ atmosphere, seed, holdMinutes, colorant }: GlazeParams): MeshPhysicalNodeMaterial {
   const material = new MeshPhysicalNodeMaterial();
   // Lathe walls have no thickness (a deliberate scope cut) — render both faces
   // so open forms like bowls show their inside.
@@ -253,7 +290,7 @@ export function createTenmokuMaterial({ atmosphere, seed, holdMinutes }: GlazePa
   const base = mix(color(iron), color(rust), breaking);
 
   const spots = texture(oilSpotTexture({ seed, holdMinutes }));
-  material.colorNode = mix(base, spots.rgb, spots.a);
+  material.colorNode = withColorant(mix(base, spots.rgb, spots.a), colorant);
 
   material.roughness = 0.3;
   material.clearcoat = 0.9;
@@ -291,7 +328,7 @@ export function createShinoMaterial(params: GlazeParams): MeshPhysicalNodeMateri
   const pooling = attribute<"float">("aPooling", "float");
   const toastRidges = smoothstep(float(0.18), float(0.6), min(pooling, 0).negate());
   const toast = toastRidges.mul(0.8).add(smoothstep(float(0.88), float(1.0), uv().y).mul(0.5)).clamp(0, 1);
-  material.colorNode = mix(blushes.rgb, blushes.rgb.mul(vec3(1.12, 0.82, 0.6)), toast);
+  material.colorNode = withColorant(mix(blushes.rgb, blushes.rgb.mul(vec3(1.12, 0.82, 0.6)), toast), params.colorant);
 
   material.roughness = 0.42;
   material.clearcoat = 0.35;
@@ -322,7 +359,7 @@ export function createCopperRedMaterial(params: GlazeParams): MeshPhysicalNodeMa
   const ridges = smoothstep(float(0.18), float(0.6), min(pooling, 0).negate());
   const lip = ridges.mul(0.9).add(smoothstep(float(0.86), float(1.0), uv().y).mul(0.85)).clamp(0, 1);
   const lipColor = params.atmosphere === "reduction" ? new Color("#ded2c2") : new Color("#e7e3d2");
-  material.colorNode = mix(base.rgb, color(lipColor), lip.mul(0.8));
+  material.colorNode = withColorant(mix(base.rgb, color(lipColor), lip.mul(0.8)), params.colorant);
 
   // Oxblood is deep wet glass; the oxidation green is drier, closer to satin.
   const glassy = params.atmosphere === "reduction";
@@ -350,7 +387,7 @@ export function createAshMaterial(params: GlazeParams): MeshPhysicalNodeMaterial
   const runs = texture(ashTexture(params));
   const pooling = max(attribute<"float">("aPooling", "float"), 0);
   // Thick ash glass goes deep olive — multiply toward green rather than black.
-  material.colorNode = mix(runs.rgb, runs.rgb.mul(vec3(0.55, 0.72, 0.45)), pooling.mul(0.8).clamp(0, 1));
+  material.colorNode = withColorant(mix(runs.rgb, runs.rgb.mul(vec3(0.55, 0.72, 0.45)), pooling.mul(0.8).clamp(0, 1)), params.colorant);
 
   material.roughness = 0.3;
   material.clearcoat = 0.7;

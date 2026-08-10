@@ -16,6 +16,8 @@ export type FiringSettings = {
   atmosphere: "oxidation" | "reduction";
   holdMinutes: number;
   seed: number;
+  /** Which metal oxide colours the melt (mirrors the engine's Colorant). */
+  colorant: "iron" | "cobalt" | "chrome" | "manganese" | "rutile";
   /**
    * Preset form name when the pot was thrown from a preset, or null when it
    * was thrown from a pen-tool curve. Drives the playground cross-link: a

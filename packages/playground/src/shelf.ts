@@ -12,7 +12,7 @@
  * canvas-readback timing questions.
  */
 
-import { PRESETS, type Atmosphere, type PresetName, sampleProfile } from "@kiln/engine";
+import { PRESETS, type Atmosphere, type Colorant, type PresetName, sampleProfile } from "@kiln/engine";
 
 export type GlazeName = "celadon" | "crystalline" | "tenmoku" | "shino" | "copper-red" | "ash";
 
@@ -22,6 +22,7 @@ export type Recipe = {
   atmosphere: Atmosphere;
   holdMinutes: number;
   seed: number;
+  colorant: Colorant;
 };
 
 export type ShelfEntry = {
@@ -37,7 +38,13 @@ export function loadShelf(): ShelfEntry[] {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed as ShelfEntry[];
+    // Entries saved before the colorant existed get the traditional oxide —
+    // a missing colorant must never crash a material factory. (?? not a
+    // default-first spread: the type says colorant exists, the old JSON may not.)
+    return (parsed as ShelfEntry[]).map((entry) => ({
+      ...entry,
+      recipe: { ...entry.recipe, colorant: entry.recipe.colorant ?? "iron" },
+    }));
   } catch {
     return [];
   }

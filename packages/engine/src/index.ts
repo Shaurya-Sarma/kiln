@@ -12,7 +12,7 @@ export {
   createShinoMaterial,
   createTenmokuMaterial,
 } from "./glazes.js";
-export type { Atmosphere, GlazeParams, FiringParams } from "./glazes.js";
+export type { Atmosphere, Colorant, GlazeParams, FiringParams } from "./glazes.js";
 export { PRESETS } from "./presets.js";
 export { ashTexture, copperRedTexture, crystallineTexture, oilSpotTexture, shinoTexture } from "./textures.js";
 export type { CrystallineParams, OilSpotParams, SeededGlazeParams } from "./textures.js";

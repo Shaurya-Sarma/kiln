@@ -27,6 +27,7 @@ function shareUrl(settings: FiringSettings): string {
     ["atmosphere", settings.atmosphere],
     ["hold", String(settings.holdMinutes)],
     ["seed", String(settings.seed)],
+    ["colorant", settings.colorant],
     ...(settings.form ? [["form", settings.form] as const] : []),
   ];
   const q = parts.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");

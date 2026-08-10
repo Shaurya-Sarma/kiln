@@ -47,6 +47,7 @@ import {
   studioEnvironment,
 } from "@kiln/engine";
 import { type GlazeName, type Recipe, type ShelfEntry, loadShelf, saveShelf, sketchThumbnail } from "./shelf.js";
+import type { Colorant } from "@kiln/engine";
 import {
   clayGrab,
   dialStep,
@@ -81,7 +82,7 @@ const GLAZES: Record<GlazeName, (r: Recipe) => Material> = {
   ash: (r) => createAshMaterial(firing(r)),
 };
 function firing(r: Recipe) {
-  return { atmosphere: r.atmosphere, seed: r.seed, holdMinutes: r.holdMinutes };
+  return { atmosphere: r.atmosphere, seed: r.seed, holdMinutes: r.holdMinutes, colorant: r.colorant };
 }
 
 /** What is happening in the melt, and what the kiln varies per firing —
@@ -161,6 +162,7 @@ async function main() {
     atmosphere: (params.get("atmosphere") ?? "reduction") as Atmosphere,
     holdMinutes: Number(params.get("hold") ?? 45),
     seed: Number(params.get("seed") ?? newFiringSeed()),
+    colorant: (params.get("colorant") ?? "iron") as Colorant,
   };
 
   function syncUrl() {
@@ -170,6 +172,7 @@ async function main() {
       atmosphere: recipe.atmosphere,
       hold: String(recipe.holdMinutes),
       seed: String(recipe.seed),
+      colorant: recipe.colorant,
     });
     history.replaceState(null, "", `?${q}`);
   }
@@ -465,6 +468,11 @@ async function main() {
           .join("")}</select>
       </label>
       <p class="glaze-note" id="glazeNote"></p>
+      <label>colorant
+        <select id="colorant">${(["iron", "cobalt", "chrome", "manganese", "rutile"] as const)
+          .map((c) => `<option value="${c}" ${c === recipe.colorant ? "selected" : ""}>${c}</option>`)
+          .join("")}</select>
+      </label>
       <label>atmosphere
         <select id="atmosphere">${(["reduction", "oxidation"] as const)
           .map((a) => `<option value="${a}" ${a === recipe.atmosphere ? "selected" : ""}>${a}</option>`)
@@ -561,10 +569,10 @@ async function main() {
   // ?demo=1 pre-stocks the shelf (screenshots, first-visit demos).
   if (params.get("demo") === "1" && shelf.length === 0) {
     shelf = [
-      { recipe: { form: "bowl", glaze: "celadon", atmosphere: "reduction", holdMinutes: 30, seed: 1204 }, savedAt: 0 },
-      { recipe: { form: "bottle", glaze: "crystalline", atmosphere: "reduction", holdMinutes: 75, seed: 417 }, savedAt: 0 },
-      { recipe: { form: "vase", glaze: "crystalline", atmosphere: "oxidation", holdMinutes: 60, seed: 2024 }, savedAt: 0 },
-      { recipe: { form: "mug", glaze: "tenmoku", atmosphere: "oxidation", holdMinutes: 20, seed: 88 }, savedAt: 0 },
+      { recipe: { form: "bowl", glaze: "celadon", atmosphere: "reduction", holdMinutes: 30, seed: 1204, colorant: "iron" }, savedAt: 0 },
+      { recipe: { form: "bottle", glaze: "crystalline", atmosphere: "reduction", holdMinutes: 75, seed: 417, colorant: "iron" }, savedAt: 0 },
+      { recipe: { form: "vase", glaze: "crystalline", atmosphere: "oxidation", holdMinutes: 60, seed: 2024, colorant: "cobalt" }, savedAt: 0 },
+      { recipe: { form: "mug", glaze: "tenmoku", atmosphere: "oxidation", holdMinutes: 20, seed: 88, colorant: "iron" }, savedAt: 0 },
     ];
     saveShelf(shelf);
   }
@@ -575,6 +583,7 @@ async function main() {
     chrome.querySelector<HTMLSelectElement>("#preset")!.value = recipe.form;
     chrome.querySelector<HTMLSelectElement>("#glaze")!.value = recipe.glaze;
     chrome.querySelector<HTMLSelectElement>("#atmosphere")!.value = recipe.atmosphere;
+    chrome.querySelector<HTMLSelectElement>("#colorant")!.value = recipe.colorant;
     chrome.querySelector<HTMLInputElement>("#hold")!.value = String(recipe.holdMinutes);
     chrome.querySelector<HTMLSpanElement>("#holdLabel")!.textContent = `${recipe.holdMinutes} min`;
   }
@@ -589,6 +598,10 @@ async function main() {
   chrome.querySelector<HTMLSelectElement>("#glaze")!.addEventListener("change", (e) => {
     uiTick("glaze");
     setWorkingPot({ ...recipe, glaze: (e.target as HTMLSelectElement).value as GlazeName });
+  });
+  chrome.querySelector<HTMLSelectElement>("#colorant")!.addEventListener("change", (e) => {
+    uiTick("glaze");
+    setWorkingPot({ ...recipe, colorant: (e.target as HTMLSelectElement).value as Colorant });
   });
   chrome.querySelector<HTMLSelectElement>("#atmosphere")!.addEventListener("change", (e) => {
     uiTick("atmosphere");

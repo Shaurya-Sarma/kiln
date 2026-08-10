@@ -82,6 +82,15 @@ const html = `<!DOCTYPE html>
           <option value="ash">ash</option>
         </select>
       </label>
+      <label>colorant
+        <select id="colorant">
+          <option value="iron" selected>iron (traditional)</option>
+          <option value="cobalt">cobalt</option>
+          <option value="chrome">chrome</option>
+          <option value="manganese">manganese</option>
+          <option value="rutile">rutile</option>
+        </select>
+      </label>
       <label>atmosphere
         <select id="atmosphere">
           <option value="reduction" selected>reduction</option>

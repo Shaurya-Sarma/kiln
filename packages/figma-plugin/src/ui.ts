@@ -75,6 +75,7 @@ async function main() {
     atmosphere: "reduction",
     holdMinutes: 45,
     seed: newFiringSeed(),
+    colorant: "iron",
     preset: "vase",
     selectionProfile: null,
     sourceName: null,
@@ -210,6 +211,10 @@ async function main() {
     state.atmosphere = (e.target as HTMLSelectElement).value as FiringSettings["atmosphere"];
     firePot();
   });
+  app.querySelector<HTMLSelectElement>("#colorant")!.addEventListener("change", (e) => {
+    state.colorant = (e.target as HTMLSelectElement).value as FiringSettings["colorant"];
+    firePot();
+  });
   const holdLabel = app.querySelector<HTMLSpanElement>("#holdLabel")!;
   app.querySelector<HTMLInputElement>("#hold")!.addEventListener("input", (e) => {
     state.holdMinutes = Number((e.target as HTMLInputElement).value);
@@ -249,6 +254,7 @@ async function main() {
       atmosphere: state.atmosphere,
       holdMinutes: state.holdMinutes,
       seed: state.seed,
+      colorant: state.colorant,
       // Preset pots are fully reproducible in the playground; curve-thrown
       // pots aren't (their form lives in the Figma file), so form is null.
       form: state.selectionProfile ? null : state.preset,
@@ -263,7 +269,8 @@ async function main() {
       state.selectionProfile = message.points;
       state.sourceName = message.sourceName;
       if (message.restore) {
-        Object.assign(state, message.restore);
+        // Pots exported before the colorant existed restore as traditional iron.
+        Object.assign(state, { colorant: "iron" }, message.restore);
         syncControls();
       }
       firePot();
@@ -278,6 +285,7 @@ async function main() {
   function syncControls() {
     app.querySelector<HTMLSelectElement>("#glaze")!.value = state.glaze;
     app.querySelector<HTMLSelectElement>("#atmosphere")!.value = state.atmosphere;
+    app.querySelector<HTMLSelectElement>("#colorant")!.value = state.colorant;
     const hold = app.querySelector<HTMLInputElement>("#hold")!;
     hold.value = String(state.holdMinutes);
     holdLabel.textContent = `${state.holdMinutes} min`;
