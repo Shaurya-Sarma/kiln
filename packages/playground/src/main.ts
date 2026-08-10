@@ -78,6 +78,22 @@ const GLAZES: Record<GlazeName, (r: Recipe) => Material> = {
   ash: (r) => createAshMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
 };
 
+/** What is happening in the melt, and what the kiln varies per firing —
+ * shown under the glaze picker so the controls teach the craft they model. */
+const GLAZE_NOTES: Record<GlazeName, string> = {
+  celadon:
+    "Iron dissolved in translucent glass — pale where thin, deep jade where it pools. Reduction fires green; oxidation, honey.",
+  crystalline:
+    "Zinc crystals bloom as the kiln cools. The firing decides where they start; the hold decides how large they grow.",
+  tenmoku:
+    "Iron-saturated black that breaks to rust on rims and ridges. Oil spots mark where bubbles surfaced from the melt.",
+  shino:
+    "The glaze that does what it wants — flame blushes it orange, smoke traps grey under the melt. No two firings agree.",
+  "copper-red":
+    "Copper starved of oxygen turns blood-red with violet veils. Give the same recipe air and it settles into quiet green.",
+  ash: "Wood ash melts into runny glass and rivulets down the wall. Each firing the drips choose new paths.",
+};
+
 async function main() {
   const app = document.querySelector<HTMLDivElement>("#app");
   if (!app) throw new Error("missing #app");
@@ -331,6 +347,10 @@ async function main() {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
+  // Zoom stays within the exhibit: close enough to read a crystal, never so
+  // far the pot becomes a speck on an endless paper plain.
+  controls.minDistance = 2.4;
+  controls.maxDistance = 9;
   controls.target.set(0, 0.9, 0);
 
   // ---------- spin the pot like a wheel ----------
@@ -425,7 +445,6 @@ async function main() {
     <i class="tick tl"></i><i class="tick tr"></i><i class="tick bl"></i><i class="tick br"></i>
     <header class="masthead">
       <h1><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#6F4930"/><path fill="#F4EAD5" d="M 25 11 L 40 10 L 38 15 L 37 20 L 45 26 L 48 35 L 44 47 L 40 51 L 42 56 L 23 57 L 26 51 L 21 46 L 16 34 L 20 25 L 27 19 L 26 14 Z"/></svg>Kiln</h1>
-      <p class="tagline">throw · glaze · fire — <em>the kiln decides</em></p>
     </header>
     <div class="panel">
       <p class="recipe-title">FIRING RECIPE</p>
@@ -439,6 +458,7 @@ async function main() {
           .map((n) => `<option value="${n}" ${n === recipe.glaze ? "selected" : ""}>${n}</option>`)
           .join("")}</select>
       </label>
+      <p class="glaze-note" id="glazeNote"></p>
       <label>atmosphere
         <select id="atmosphere">${(["reduction", "oxidation"] as const)
           .map((a) => `<option value="${a}" ${a === recipe.atmosphere ? "selected" : ""}>${a}</option>`)
@@ -482,6 +502,7 @@ async function main() {
       `${recipe.atmosphere} fire · ${recipe.holdMinutes} min hold · ${firingLabel(recipe.seed)}`;
     seedEl.textContent = firingLabel(recipe.seed);
     bignumEl.textContent = firingLabel(recipe.seed).replace("no. ", "");
+    glazeNoteEl.textContent = GLAZE_NOTES[recipe.glaze];
     document.title = `Kiln — firing ${firingLabel(recipe.seed)}`;
   }
 
@@ -496,20 +517,22 @@ async function main() {
     shelf.forEach((entry, index) => {
       const item = document.createElement("div");
       item.className = "shelf-item";
+      // Delete lives ON the thumbnail as a corner badge (revealed on hover) —
+      // a bare "×" floating under the name was too small to find and too easy
+      // to miss; a badge on the artifact reads as "remove THIS".
       item.innerHTML = `
-        <img src="${sketchThumbnail(entry.recipe)}" alt="" title="load onto the pedestal" />
-        <p class="shelf-name">${firingLabel(entry.recipe.seed)}</p>
-        <div class="shelf-actions">
-          <button title="remove from shelf">×</button>
+        <div class="shelf-thumb">
+          <img src="${sketchThumbnail(entry.recipe)}" alt="" title="load onto the pedestal" />
+          <button class="shelf-remove" title="remove from shelf">×</button>
         </div>
+        <p class="shelf-name">${firingLabel(entry.recipe.seed)}</p>
       `;
       item.querySelector("img")!.addEventListener("click", () => {
         shelfLift(); // a dry hand taking it off the board
         setWorkingPot(entry.recipe);
         syncControls();
       });
-      const removeBtn = item.querySelector("button");
-      removeBtn!.addEventListener("click", () => {
+      item.querySelector<HTMLButtonElement>(".shelf-remove")!.addEventListener("click", () => {
         shelfRemove();
         shelf = shelf.filter((_, i) => i !== index);
         saveShelf(shelf);
@@ -554,6 +577,9 @@ async function main() {
     uiTick("form");
     setWorkingPot({ ...recipe, form: (e.target as HTMLSelectElement).value as PresetName });
   });
+  const glazeNoteEl = chrome.querySelector<HTMLParagraphElement>("#glazeNote")!;
+  const updateGlazeNote = () => (glazeNoteEl.textContent = GLAZE_NOTES[recipe.glaze]);
+  updateGlazeNote();
   chrome.querySelector<HTMLSelectElement>("#glaze")!.addEventListener("change", (e) => {
     uiTick("glaze");
     setWorkingPot({ ...recipe, glaze: (e.target as HTMLSelectElement).value as GlazeName });

@@ -524,3 +524,63 @@ body,
   width: 100%;
   margin: 8px 0 10px;
 }
+
+/* ---------- polish round: placard nowrap, shelf badge, glaze note ---------- */
+
+/* The meta line must never wrap — the placard grows to fit it instead. */
+.placard {
+  width: max-content;
+  min-width: 250px;
+  max-width: min(90vw, 460px);
+}
+
+.placard-meta {
+  white-space: nowrap;
+}
+
+.glaze-note {
+  margin: -6px 0 13px;
+  font-family: "Fraunces Variable", serif;
+  font-style: italic;
+  font-size: 11.5px;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink-faint);
+}
+
+/* Delete as a corner badge on the thumbnail — visible on hover, big enough
+   to hit, unmistakably about THIS pot. */
+.shelf-thumb {
+  position: relative;
+  display: inline-block;
+}
+
+.shelf-remove {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 21px;
+  height: 21px;
+  padding: 0;
+  border-radius: 50%;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink-soft);
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.shelf-item:hover .shelf-remove {
+  opacity: 1;
+}
+
+.shelf-remove:hover {
+  background: var(--brick);
+  border-color: var(--brick);
+  color: var(--paper-raised);
+}
