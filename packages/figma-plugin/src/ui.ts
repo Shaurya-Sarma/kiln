@@ -28,6 +28,7 @@ import {
 import { WebGPURenderer } from "three/webgpu";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
+  type FiringParams,
   PRESETS,
   type PresetName,
   type Profile,
@@ -42,10 +43,12 @@ import {
 } from "@kiln/engine";
 import type { FiringSettings, SandboxMessage, UiMessage } from "./messages.js";
 
+// Typed against the engine's FiringParams (atmosphere/seed/hold) — the
+// materials never see UI-only facts like which preset or curve is loaded.
 const GLAZES = {
-  celadon: (s: FiringSettings) => createCeladonMaterial(s),
-  crystalline: (s: FiringSettings) => createCrystallineMaterial(s),
-  tenmoku: (s: FiringSettings) => createTenmokuMaterial(s),
+  celadon: (s: FiringParams) => createCeladonMaterial(s),
+  crystalline: (s: FiringParams) => createCrystallineMaterial(s),
+  tenmoku: (s: FiringParams) => createTenmokuMaterial(s),
 };
 
 function post(message: UiMessage, transfer?: Transferable[]) {
@@ -55,7 +58,13 @@ function post(message: UiMessage, transfer?: Transferable[]) {
 async function main() {
   const app = document.querySelector<HTMLDivElement>("#app")!;
 
-  const state: FiringSettings & { preset: PresetName; selectionProfile: Profile | null; sourceName: string | null } = {
+  // `form` is deliberately absent from state: it's DERIVED at export time
+  // (preset name, or null when thrown from a curve) — see settingsOnly().
+  const state: Omit<FiringSettings, "form"> & {
+    preset: PresetName;
+    selectionProfile: Profile | null;
+    sourceName: string | null;
+  } = {
     glaze: "celadon",
     atmosphere: "reduction",
     holdMinutes: 45,
@@ -66,7 +75,9 @@ async function main() {
   };
 
   // ---------- renderer & scene (compact gallery) ----------
-  const renderer = new WebGPURenderer({ antialias: true, forceWebGL: true });
+  // alpha:true so transparent exports work; the visible viewport still shows
+  // the paper background because scene.background is set below.
+  const renderer = new WebGPURenderer({ antialias: true, forceWebGL: true, alpha: true });
   await renderer.init();
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -75,7 +86,8 @@ async function main() {
   app.querySelector("#viewport")!.appendChild(renderer.domElement);
 
   const scene = new Scene();
-  scene.background = new Color("#f4f1ec");
+  const paper = new Color("#f4f1ec");
+  scene.background = paper;
 
   const camera = new PerspectiveCamera(35, 1, 0.1, 100);
   camera.position.set(0, 1.6, 4.6);
@@ -139,21 +151,33 @@ async function main() {
    * must happen in the same task as the render (before the browser composits
    * a new frame), which is why this is synchronous after render().
    */
-  function capture(size: number): Uint8Array {
+  function capture(size: number, transparent: boolean): Uint8Array {
     const el = renderer.domElement;
     const prevW = el.width;
     const prevH = el.height;
+    // Transparent export: drop the paper backdrop and the floor so the pot
+    // (and its own shadow-free silhouette) lands as a clean design asset.
+    if (transparent) {
+      scene.background = null;
+      ground.visible = false;
+    }
     renderer.setSize(size, size, false);
     camera.aspect = 1;
     camera.updateProjectionMatrix();
     renderer.render(scene, camera);
     const dataUrl = el.toDataURL("image/png");
+    if (transparent) {
+      scene.background = paper;
+      ground.visible = true;
+    }
     renderer.setSize(prevW, prevH, false);
     resize();
     const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
     const binary = atob(base64);
     return Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
   }
+
+  const transparentBox = app.querySelector<HTMLInputElement>("#transparent")!;
 
   function currentLabel(): string {
     return `${state.glaze} · ${state.atmosphere} · firing ${firingLabel(state.seed)}`;
@@ -192,27 +216,37 @@ async function main() {
   });
 
   app.querySelector<HTMLButtonElement>("#place")!.addEventListener("click", () => {
-    const png = capture(1024);
+    const png = capture(1024, transparentBox.checked);
     post({ type: "place-render", png, label: currentLabel(), settings: settingsOnly() }, [png.buffer]);
   });
 
-  app.querySelector<HTMLButtonElement>("#tiles")!.addEventListener("click", () => {
+  function runTestTiles() {
     // Nine firings of the current setup — same pot, same glaze, nine seeds.
     // The grid IS the point: this is how potters (test tiles) and designers
-    // (variant grids) both explore an option space.
+    // (variant grids) both explore an option space — the sandbox places them
+    // as a component set with a `firing` variant property.
     const keepSeed = state.seed;
     const tiles = Array.from({ length: 9 }, () => {
       state.seed = newFiringSeed();
       firePot();
-      return { png: capture(512), label: currentLabel(), seed: state.seed };
+      return { png: capture(512, transparentBox.checked), label: currentLabel(), seed: state.seed };
     });
     state.seed = keepSeed;
     firePot();
     post({ type: "place-test-tiles", tiles, settings: settingsOnly() }, tiles.map((t) => t.png.buffer));
-  });
+  }
+  app.querySelector<HTMLButtonElement>("#tiles")!.addEventListener("click", runTestTiles);
 
   function settingsOnly(): FiringSettings {
-    return { glaze: state.glaze, atmosphere: state.atmosphere, holdMinutes: state.holdMinutes, seed: state.seed };
+    return {
+      glaze: state.glaze,
+      atmosphere: state.atmosphere,
+      holdMinutes: state.holdMinutes,
+      seed: state.seed,
+      // Preset pots are fully reproducible in the playground; curve-thrown
+      // pots aren't (their form lives in the Figma file), so form is null.
+      form: state.selectionProfile ? null : state.preset,
+    };
   }
 
   // ---------- messages from the sandbox ----------
@@ -227,8 +261,13 @@ async function main() {
         syncControls();
       }
       firePot();
+      if (message.autorun === "tiles" && !autoranTiles) {
+        autoranTiles = true;
+        runTestTiles();
+      }
     }
   };
+  let autoranTiles = false;
 
   function syncControls() {
     app.querySelector<HTMLSelectElement>("#glaze")!.value = state.glaze;

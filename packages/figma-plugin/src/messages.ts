@@ -16,6 +16,13 @@ export type FiringSettings = {
   atmosphere: "oxidation" | "reduction";
   holdMinutes: number;
   seed: number;
+  /**
+   * Preset form name when the pot was thrown from a preset, or null when it
+   * was thrown from a pen-tool curve. Drives the playground cross-link: a
+   * preset pot's URL reproduces the whole pot; a curve pot's URL reproduces
+   * the glaze firing but not the form (the form lives in the Figma file).
+   */
+  form: string | null;
 };
 
 /** Sandbox → UI. */
@@ -29,6 +36,8 @@ export type SandboxMessage =
       sourceName: string | null;
       /** Previous firing settings when relaunched from an exported pot. */
       restore: FiringSettings | null;
+      /** Set when a menu command should run immediately on open. */
+      autorun: "tiles" | null;
     }
   | { type: "error"; message: string };
 

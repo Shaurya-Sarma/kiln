@@ -8,5 +8,14 @@
   "networkAccess": {
     "allowedDomains": ["none"]
   },
-  "relaunchButtons": [{ "command": "refire", "name": "Re-fire in Kiln" }]
+  "menu": [
+    { "name": "Throw from selection", "command": "throw" },
+    { "name": "Test tiles ×9", "command": "tiles" },
+    { "separator": true },
+    { "name": "Open the playground", "command": "playground" }
+  ],
+  "relaunchButtons": [
+    { "command": "refire", "name": "Re-fire in Kiln" },
+    { "command": "playground", "name": "Open in the Kiln playground" }
+  ]
 }

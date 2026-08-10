@@ -58,6 +58,8 @@ const html = `<!DOCTYPE html>
   .secondary { color: #6b5d4f; background: #fffdf9; border: 1px solid rgba(107,93,79,.3); letter-spacing: 0.14em; }
   .secondary:hover { background: #f2ede4; }
   .seed { margin: 8px 0 0; font-size: 10.5px; letter-spacing: 0.14em; color: #a1927f; }
+  .check { display: flex; align-items: center; gap: 6px; margin: 8px 0 2px; text-transform: none; letter-spacing: 0.08em; font-size: 10.5px; }
+  .check input { accent-color: #b0492e; margin: 0; }
   .row2 { display: flex; gap: 8px; }
 </style>
 </head>
@@ -88,6 +90,7 @@ const html = `<!DOCTYPE html>
       </label>
       <button id="fire">FIRE</button>
       <p class="seed">firing <span id="seed"></span></p>
+      <label class="check"><input type="checkbox" id="transparent" /> transparent background</label>
       <div class="row2">
         <button id="place" class="secondary">place on canvas</button>
         <button id="tiles" class="secondary">test tiles ×9</button>
