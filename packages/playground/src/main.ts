@@ -168,6 +168,19 @@ async function main() {
     seed: Number(params.get("seed") ?? newFiringSeed()),
     colorant: (params.get("colorant") ?? "iron") as Colorant,
   };
+  // ?demo=gallery — the video set: a known-good hero firing (the rest of the
+  // scene is the stocked shelf, below). Plain data mutation only: boot renders
+  // it through the normal path at the end of main().
+  if (params.get("demo") === "gallery") {
+    Object.assign(recipe, {
+      form: "moon-jar",
+      glaze: "shino",
+      atmosphere: "reduction",
+      holdMinutes: 60,
+      seed: 111,
+      colorant: "iron",
+    } satisfies Recipe);
+  }
 
   function syncUrl() {
     const q = new URLSearchParams({
@@ -591,6 +604,24 @@ async function main() {
       shelfPlace(); // the knock of a pot set on the wooden shelf board
     }
   });
+
+  // ?demo=gallery — the video set: a three-pot table of known-good firings
+  // and a stocked shelf. Every seed here was auditioned; nothing is random
+  // about this "randomness", which is the point of seeds.
+  if (params.get("demo") === "gallery") {
+    if (shelf.length === 0) {
+      shelf = [
+        { recipe: { form: "bowl", glaze: "celadon", atmosphere: "reduction", holdMinutes: 30, seed: 1204, colorant: "iron" }, savedAt: 0 },
+        { recipe: { form: "goblet", glaze: "crystalline", atmosphere: "reduction", holdMinutes: 75, seed: 417, colorant: "cobalt" }, savedAt: 0 },
+        { recipe: { form: "bottle", glaze: "copper-red", atmosphere: "reduction", holdMinutes: 45, seed: 417, colorant: "iron" }, savedAt: 0 },
+        { recipe: { form: "plate", glaze: "crystalline", atmosphere: "oxidation", holdMinutes: 90, seed: 2024, colorant: "iron" }, savedAt: 0 },
+        { recipe: { form: "ginger-jar", glaze: "ash", atmosphere: "reduction", holdMinutes: 70, seed: 88, colorant: "iron" }, savedAt: 0 },
+        { recipe: { form: "mug", glaze: "tenmoku", atmosphere: "oxidation", holdMinutes: 20, seed: 88, colorant: "iron" }, savedAt: 0 },
+        { recipe: { form: "vase", glaze: "shino", atmosphere: "reduction", holdMinutes: 45, seed: 222, colorant: "iron" }, savedAt: 0 },
+      ];
+      saveShelf(shelf);
+    }
+  }
 
   // ?demo=1 pre-stocks the shelf (screenshots, first-visit demos).
   if (params.get("demo") === "1" && shelf.length === 0) {
