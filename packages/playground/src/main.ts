@@ -456,7 +456,7 @@ async function main() {
       <h1><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#6F4930"/><path fill="#F4EAD5" d="M 25 11 L 40 10 L 38 15 L 37 20 L 45 26 L 48 35 L 44 47 L 40 51 L 42 56 L 23 57 L 26 51 L 21 46 L 16 34 L 20 25 L 27 19 L 26 14 Z"/></svg>Kiln</h1>
     </header>
     <div class="panel">
-      <p class="recipe-title">FIRING RECIPE</p>
+      <p class="recipe-title"><span>FIRING RECIPE</span><button id="panelToggle" title="minimize the recipe">–</button></p>
       <label>form
         <select id="preset">${Object.keys(PRESETS)
           .map((n) => `<option value="${n}" ${n === recipe.form ? "selected" : ""}>${n}</option>`)
@@ -504,6 +504,18 @@ async function main() {
   // scene tells it is whether a hand is on a pot (setPotGrip, above). Bails out
   // on its own for touch and reduced motion, so this call is unconditional.
   initCursor();
+
+  // The recipe card folds down to its title bar — the pot is the exhibit and
+  // sometimes the card is just in the way. Remembered across visits.
+  const panelEl = chrome.querySelector<HTMLDivElement>(".panel")!;
+  const panelToggle = chrome.querySelector<HTMLButtonElement>("#panelToggle")!;
+  const setPanelCollapsed = (collapsed: boolean) => {
+    panelEl.classList.toggle("collapsed", collapsed);
+    panelToggle.textContent = collapsed ? "+" : "–";
+    localStorage.setItem("kiln.panel.v1", collapsed ? "min" : "open");
+  };
+  panelToggle.addEventListener("click", () => setPanelCollapsed(!panelEl.classList.contains("collapsed")));
+  if (localStorage.getItem("kiln.panel.v1") === "min") setPanelCollapsed(true);
 
   const seedEl = chrome.querySelector<HTMLSpanElement>("#seed")!;
   const bignumEl = chrome.querySelector<HTMLDivElement>("#bignum")!;

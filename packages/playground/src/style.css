@@ -115,6 +115,9 @@ body,
 }
 
 .panel .recipe-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin: 0 0 14px;
   font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
@@ -589,4 +592,40 @@ body,
    nothing that overhangs a thumbnail gets cut off. */
 .shelf-items {
   padding: 10px 10px 4px 2px;
+}
+
+/* ---------- minimizable recipe card ---------- */
+.panel .recipe-title button {
+  width: auto;
+  margin: 0;
+  padding: 0 2px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  letter-spacing: 0;
+  text-indent: 0;
+  cursor: pointer;
+}
+
+.panel .recipe-title button:hover {
+  color: var(--brick);
+  background: none;
+}
+
+/* Folded: just the title bar. */
+.panel.collapsed {
+  padding-bottom: 14px;
+}
+
+.panel.collapsed > :not(.recipe-title) {
+  display: none;
+}
+
+.panel.collapsed .recipe-title {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
 }
