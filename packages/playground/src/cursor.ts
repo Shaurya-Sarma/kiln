@@ -254,6 +254,13 @@ export function initCursor(): void {
     "pointermove",
     (event) => {
       targetX = event.clientX;
+      // The arrow tracks 1:1, written straight from the event — lag on the
+      // pointer itself reads as input latency, not style (user verdict, and
+      // they were right). All the personality lives in the accents' CSS
+      // transitions; the position is just honest.
+      x = targetX;
+      y = event.clientY;
+      root.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
       targetY = event.clientY;
       hover = classifyHover(event.target);
       // main.ts reports the pot hover from canvas pointermoves only, so it has
@@ -320,13 +327,9 @@ export function initCursor(): void {
       }
     }
 
-    // Lerp, deliberately not a spring: a spring overshoots, and a pointer that
-    // sails past what you're aiming at is the classic custom-cursor sin. 0.32
-    // is loose enough to feel hand-drawn and tight enough to still feel aimed.
+    // Position is written in the pointermove handler (1:1, sub-frame) — the
+    // loop only tracks per-frame velocity for the drag tilt below.
     const prevX = x;
-    x += (targetX - x) * 0.32;
-    y += (targetY - y) * 0.32;
-    root.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
 
     const next = resolveState(hover, firing);
     if (next !== state) {
