@@ -44,7 +44,7 @@ import {
   sampleProfile,
   studioEnvironment,
 } from "@kiln/engine";
-import type { FiringSettings, SandboxMessage, UiMessage } from "./messages.js";
+import type { FiringSettings, SandboxMessage, UiMessage, WireProfilePoint } from "./messages.js";
 
 // Typed against the engine's FiringParams (atmosphere/seed/hold) — the
 // materials never see UI-only facts like which preset or curve is loaded.
@@ -82,8 +82,11 @@ async function main() {
   };
 
   // ---------- renderer & scene (compact gallery) ----------
-  // alpha:true so transparent exports work; the visible viewport still shows
-  // the paper background because scene.background is set below.
+  // alpha:true so transparent exports work — and so the LIVE viewport takes its
+  // paper from CSS like the playground does. A tone-mapped scene.background
+  // renders that same paper cold and grey, which read as a different product
+  // from the warm notebook half an inch below it. It goes back on only for an
+  // opaque export, where there's no page behind the pixels (see capture()).
   const renderer = new WebGPURenderer({ antialias: true, forceWebGL: true, alpha: true });
   await renderer.init();
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -94,7 +97,6 @@ async function main() {
 
   const scene = new Scene();
   const paper = new Color("#f4f1ec");
-  scene.background = paper;
 
   const camera = new PerspectiveCamera(35, 1, 0.1, 100);
   camera.position.set(0, 1.6, 4.6);
@@ -162,11 +164,14 @@ async function main() {
     const el = renderer.domElement;
     const prevW = el.width;
     const prevH = el.height;
-    // Transparent export: drop the paper backdrop and the floor so the pot
-    // (and its own shadow-free silhouette) lands as a clean design asset.
+    // Transparent export: drop the floor so the pot (and its own shadow-free
+    // silhouette) lands as a clean design asset. An opaque export is the one
+    // case that needs a real backdrop — nothing sits behind an exported PNG the
+    // way the panel's paper sits behind the live canvas.
     if (transparent) {
-      scene.background = null;
       ground.visible = false;
+    } else {
+      scene.background = paper;
     }
     renderer.setSize(size, size, false);
     camera.aspect = 1;
@@ -174,8 +179,9 @@ async function main() {
     renderer.render(scene, camera);
     const dataUrl = el.toDataURL("image/png");
     if (transparent) {
-      scene.background = paper;
       ground.visible = true;
+    } else {
+      scene.background = null;
     }
     renderer.setSize(prevW, prevH, false);
     resize();
@@ -228,7 +234,9 @@ async function main() {
 
   app.querySelector<HTMLButtonElement>("#place")!.addEventListener("click", () => {
     const png = capture(1024, transparentBox.checked);
-    post({ type: "place-render", png, label: currentLabel(), settings: settingsOnly() }, [png.buffer]);
+    post({ type: "place-render", png, label: currentLabel(), settings: settingsOnly(), profile: profileOnly() }, [
+      png.buffer,
+    ]);
   });
 
   function runTestTiles() {
@@ -244,7 +252,10 @@ async function main() {
     });
     state.seed = keepSeed;
     firePot();
-    post({ type: "place-test-tiles", tiles, settings: settingsOnly() }, tiles.map((t) => t.png.buffer));
+    post(
+      { type: "place-test-tiles", tiles, settings: settingsOnly(), profile: profileOnly() },
+      tiles.map((t) => t.png.buffer),
+    );
   }
   app.querySelector<HTMLButtonElement>("#tiles")!.addEventListener("click", runTestTiles);
 
@@ -261,17 +272,46 @@ async function main() {
     };
   }
 
+  /**
+   * The form that was actually thrown, for the sandbox to store on the pot. A
+   * preset pot sends null — settings.form names it, and the preset table is code
+   * we ship. A curve pot sends its points, because they exist nowhere else.
+   */
+  function profileOnly(): WireProfilePoint[] | null {
+    return state.selectionProfile?.map(({ radius, height }) => ({ radius, height })) ?? null;
+  }
+
   // ---------- messages from the sandbox ----------
+  /** The form a re-fired pot brought with it, kept until a new curve replaces it. */
+  let restoredForm: WireProfilePoint[] | null = null;
+
   onmessage = (event: MessageEvent<{ pluginMessage?: SandboxMessage }>) => {
     const message = event.data.pluginMessage;
     if (!message) return;
     if (message.type === "profile") {
-      state.selectionProfile = message.points;
-      state.sourceName = message.sourceName;
       if (message.restore) {
         // Pots exported before the colorant existed restore as traditional iron.
-        Object.assign(state, { colorant: "iron" }, message.restore);
+        Object.assign(state, { colorant: "iron" }, message.restore.settings);
+        // Curve pots carry their own form; a preset pot names one we still ship.
+        restoredForm = message.restore.profile;
+        if (restoredPreset(message.restore.settings.form)) state.preset = message.restore.settings.form;
         syncControls();
+      }
+      // A re-fired pot's form outlives the selection. What's selected at re-fire
+      // time is the pot, not the curve it was thrown from — and that curve may
+      // have moved or been deleted since the firing — so a stray click elsewhere
+      // mustn't quietly turn the pot back into a preset. Selecting a usable
+      // curve is the one thing that replaces a restored form.
+      if (message.points) {
+        restoredForm = null;
+        state.selectionProfile = message.points;
+        state.sourceName = message.sourceName;
+      } else if (restoredForm) {
+        state.selectionProfile = restoredForm;
+        state.sourceName = "re-fired pot";
+      } else {
+        state.selectionProfile = null;
+        state.sourceName = null;
       }
       firePot();
       if (message.autorun === "tiles" && !autoranTiles) {
@@ -282,7 +322,13 @@ async function main() {
   };
   let autoranTiles = false;
 
+  /** A stored form name only names a preset if we still ship that preset. */
+  function restoredPreset(form: string | null): form is PresetName {
+    return form !== null && form in PRESETS;
+  }
+
   function syncControls() {
+    formSel.value = state.preset;
     app.querySelector<HTMLSelectElement>("#glaze")!.value = state.glaze;
     app.querySelector<HTMLSelectElement>("#atmosphere")!.value = state.atmosphere;
     app.querySelector<HTMLSelectElement>("#colorant")!.value = state.colorant;

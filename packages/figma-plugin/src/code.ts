@@ -6,10 +6,11 @@
  * produces back onto the canvas. All rendering lives in the UI iframe.
  */
 
-import type { FiringSettings, SandboxMessage, UiMessage } from "./messages.js";
+import type { FiringSettings, RestoredPot, SandboxMessage, UiMessage, WireProfilePoint } from "./messages.js";
 import { profileFromFigmaPath } from "./profile-from-figma.js";
 
 const PLUGIN_DATA_KEY = "kiln";
+const PROFILE_DATA_KEY = "kiln:profile";
 const URL_DATA_KEY = "kiln:url";
 const PLAYGROUND_URL = "https://kiln.shaux.dev";
 
@@ -81,16 +82,64 @@ function profileFromSelection(): { points: ReturnType<typeof profileFromFigmaPat
   return found;
 }
 
-/** Firing settings stored on a pot exported earlier ("Re-fire in Kiln"). */
-function restoreFromSelection(): FiringSettings | null {
-  const node = figma.currentPage.selection[0];
-  const raw = node?.getPluginData(PLUGIN_DATA_KEY);
-  if (!raw) return null;
+/**
+ * A stored profile is JSON that left our hands a while ago (an older plugin
+ * version, a copied node, a hand-edited value), so it gets checked rather than
+ * trusted: anything that isn't a list of finite (radius, height) pairs is
+ * treated as no stored form at all and the recipe restores on its own.
+ */
+function parseStoredProfile(raw: string): WireProfilePoint[] | null {
+  let value: unknown;
   try {
-    return JSON.parse(raw) as FiringSettings;
+    value = JSON.parse(raw);
   } catch {
     return null;
   }
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const points = value.filter(
+    (point): point is WireProfilePoint =>
+      typeof point === "object" &&
+      point !== null &&
+      Number.isFinite((point as WireProfilePoint).radius) &&
+      Number.isFinite((point as WireProfilePoint).height),
+  );
+  return points.length === value.length ? points : null;
+}
+
+/**
+ * The pot stored on a node exported earlier ("Re-fire in Kiln"): its recipe,
+ * and its form when it was thrown from a curve. Pots placed before the form was
+ * stored have the recipe key only — they restore with `profile: null`, exactly
+ * as they did before, rather than failing to restore at all.
+ */
+function restoreFromSelection(): RestoredPot | null {
+  const node = figma.currentPage.selection[0];
+  const raw = node?.getPluginData(PLUGIN_DATA_KEY);
+  if (!raw) return null;
+  let settings: FiringSettings;
+  try {
+    settings = JSON.parse(raw) as FiringSettings;
+  } catch {
+    return null;
+  }
+  const storedProfile = node?.getPluginData(PROFILE_DATA_KEY);
+  return { settings, profile: storedProfile ? parseStoredProfile(storedProfile) : null };
+}
+
+/**
+ * Stamp a placed pot with everything needed to re-open it: the recipe, the form
+ * it was thrown from (curve pots only), and the live playground link.
+ */
+function stampPot(node: SceneNode, settings: FiringSettings, profile: WireProfilePoint[] | null) {
+  node.setPluginData(PLUGIN_DATA_KEY, JSON.stringify(settings));
+  // Preset pots leave this key empty: settings.form already names the form, and
+  // an empty key is what a legacy pot looks like too.
+  node.setPluginData(PROFILE_DATA_KEY, profile ? JSON.stringify(profile) : "");
+  node.setPluginData(URL_DATA_KEY, shareUrl(settings));
+  node.setRelaunchData({
+    refire: "Re-open this firing in Kiln",
+    playground: "See it live in 3D",
+  });
 }
 
 function sendProfile() {
@@ -107,7 +156,12 @@ function sendProfile() {
 }
 
 /** Place one rendered pot on the canvas as an image-filled rectangle. */
-async function placeRender(png: Uint8Array, label: string, settings: FiringSettings): Promise<SceneNode> {
+async function placeRender(
+  png: Uint8Array,
+  label: string,
+  settings: FiringSettings,
+  profile: WireProfilePoint[] | null,
+): Promise<SceneNode> {
   const image = figma.createImage(png);
   const size = await image.getSizeAsync();
 
@@ -117,14 +171,10 @@ async function placeRender(png: Uint8Array, label: string, settings: FiringSetti
   rect.fills = [{ type: "IMAGE", imageHash: image.hash, scaleMode: "FILL" }];
   rect.name = `Kiln — ${label}`;
 
-  // Everything needed to re-open this exact pot later travels on the node —
-  // the recipe (for re-firing in the plugin) and the live playground link.
-  rect.setPluginData(PLUGIN_DATA_KEY, JSON.stringify(settings));
-  rect.setPluginData(URL_DATA_KEY, shareUrl(settings));
-  rect.setRelaunchData({
-    refire: "Re-open this firing in Kiln",
-    playground: "See it live in 3D",
-  });
+  // Everything needed to re-open this exact pot later travels on the node — the
+  // recipe, the form, and the live playground link. The source curve is free to
+  // be moved, edited or deleted afterwards; the pot still re-fires.
+  stampPot(rect, settings, profile);
 
   // Land just right of the current viewport center so it's always visible.
   rect.x = Math.round(figma.viewport.center.x);
@@ -140,7 +190,7 @@ figma.ui.onmessage = async (message: UiMessage) => {
       break;
     }
     case "place-render": {
-      const rect = await placeRender(message.png, message.label, message.settings);
+      const rect = await placeRender(message.png, message.label, message.settings, message.profile);
       figma.viewport.scrollAndZoomIntoView([rect]);
       figma.notify(`Unloaded the kiln — ${message.label}`);
       break;
@@ -169,13 +219,9 @@ figma.ui.onmessage = async (message: UiMessage) => {
           // "prop=value" naming is Figma's variant grammar: these nine become
           // a single `firing` property with nine values.
           component.name = `firing=${String(tile.seed % 10000).padStart(4, "0")}`;
-          const settings = { ...message.settings, seed: tile.seed };
-          component.setPluginData(PLUGIN_DATA_KEY, JSON.stringify(settings));
-          component.setPluginData(URL_DATA_KEY, shareUrl(settings));
-          component.setRelaunchData({
-            refire: "Re-open this firing in Kiln",
-            playground: "See it live in 3D",
-          });
+          // Each tile is its own firing of the same pot, so each carries the
+          // shared form and its own seed — re-firing one variant re-throws it.
+          stampPot(component, { ...message.settings, seed: tile.seed }, message.profile);
           return component;
         }),
       );

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "typecheck": "tsc -p tsconfig.code.json && tsc -p tsconfig.ui.json"
+    "typecheck": "tsc -p tsconfig.code.json && tsc -p tsconfig.ui.json",
+    "verify": "node build.mjs && node scripts/verify-refire.mjs"
   },
   "dependencies": {
     "@kiln/engine": "workspace:*",
