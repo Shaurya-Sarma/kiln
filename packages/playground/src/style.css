@@ -427,3 +427,11 @@ body,
 .cleartable {
   bottom: 54px;
 }
+
+.soundtoggle {
+  bottom: 78px;
+}
+
+.bignum {
+  transition: transform 0.4s cubic-bezier(0.2, 0.6, 0.3, 1);
+}

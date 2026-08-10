@@ -23,7 +23,10 @@ import {
   MeshStandardMaterial,
   PCFSoftShadowMap,
   PerspectiveCamera,
+  PointLight,
+  Raycaster,
   Scene,
+  Vector2,
 } from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -41,6 +44,7 @@ import {
   studioEnvironment,
 } from "@kiln/engine";
 import { type GlazeName, type Recipe, type ShelfEntry, loadShelf, saveShelf, sketchThumbnail } from "./shelf.js";
+import { setSoundEnabled, soundEnabled, startRoar, stopRoar, tink } from "./audio.js";
 import "./style.css";
 
 const GLAZES: Record<GlazeName, (r: Recipe) => Material> = {
@@ -205,8 +209,18 @@ async function main() {
   scene.add(stage);
   const STAND_X = [0, -1.55, 1.55];
 
-  type StagePot = { mesh: Mesh; recipe: Recipe };
+  type StagePot = {
+    mesh: Mesh;
+    recipe: Recipe;
+    /** Current spin, radians/frame. Decays toward the idle wheel speed. */
+    spin: number;
+    /** When this pot landed on the stage — drives the entrance animation. */
+    bornAt: number;
+  };
   let stagePots: StagePot[] = [];
+
+  /** The wheel never quite stops: every pot's idle rotation speed. */
+  const IDLE_SPIN = 0.004;
 
   function buildPotMesh(r: Recipe): Mesh {
     const profile = PRESETS[r.form];
@@ -223,14 +237,17 @@ async function main() {
     });
   }
 
+  function removeStagePot(pot: StagePot) {
+    pot.mesh.geometry.dispose();
+    (pot.mesh.material as Material).dispose();
+    stage.remove(pot.mesh);
+  }
+
   function setWorkingPot(r: Recipe) {
     const old = stagePots[0];
-    if (old) {
-      old.mesh.geometry.dispose();
-      stage.remove(old.mesh);
-    }
+    if (old) removeStagePot(old);
     const mesh = buildPotMesh(r);
-    stagePots = [{ mesh, recipe: { ...r } }, ...stagePots.slice(1)];
+    stagePots = [{ mesh, recipe: { ...r }, spin: IDLE_SPIN, bornAt: performance.now() }, ...stagePots.slice(1)];
     stage.add(mesh);
     layoutStage();
     Object.assign(recipe, r);
@@ -239,23 +256,20 @@ async function main() {
   }
 
   function standCompanion(r: Recipe) {
-    if (stagePots.length >= 3) {
-      const dropped = stagePots.pop()!;
-      dropped.mesh.geometry.dispose();
-      stage.remove(dropped.mesh);
-    }
+    if (stagePots.length >= 3) removeStagePot(stagePots.pop()!);
     const mesh = buildPotMesh(r);
-    stagePots = [stagePots[0]!, { mesh, recipe: { ...r } }, ...stagePots.slice(1)];
+    stagePots = [
+      stagePots[0]!,
+      { mesh, recipe: { ...r }, spin: IDLE_SPIN, bornAt: performance.now() },
+      ...stagePots.slice(1),
+    ];
     stage.add(mesh);
     layoutStage();
     clearTableBtn.style.display = "";
   }
 
   function clearCompanions() {
-    stagePots.slice(1).forEach((pot) => {
-      pot.mesh.geometry.dispose();
-      stage.remove(pot.mesh);
-    });
+    stagePots.slice(1).forEach(removeStagePot);
     stagePots = stagePots.slice(0, 1);
     clearTableBtn.style.display = "none";
   }
@@ -264,6 +278,83 @@ async function main() {
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
   controls.target.set(0, 0.9, 0);
+
+  // ---------- spin the pot like a wheel ----------
+  // Dragging EMPTY space orbits the camera (OrbitControls). Dragging THE POT
+  // grabs it: it follows your hand, and a flick releases with real momentum
+  // that decays back to the idle wheel speed — the way a wheel head keeps
+  // turning after you take your hand off it.
+  const raycaster = new Raycaster();
+  const pointerNdc = new Vector2();
+  let grabbed: StagePot | null = null;
+  let lastPointerX = 0;
+  let lastDragDelta = 0;
+
+  function potUnderPointer(event: PointerEvent): StagePot | null {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointerNdc.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(pointerNdc, camera);
+    const hits = raycaster.intersectObjects(stagePots.map((pot) => pot.mesh));
+    const hitMesh = hits[0]?.object;
+    return stagePots.find((pot) => pot.mesh === hitMesh) ?? null;
+  }
+
+  renderer.domElement.addEventListener("pointerdown", (event) => {
+    const pot = potUnderPointer(event);
+    if (!pot) return;
+    grabbed = pot;
+    lastPointerX = event.clientX;
+    lastDragDelta = 0;
+    controls.enabled = false; // the hand is on the pot, not the camera
+    renderer.domElement.style.cursor = "grabbing";
+  });
+  renderer.domElement.addEventListener("pointermove", (event) => {
+    if (grabbed) {
+      const delta = event.clientX - lastPointerX;
+      lastPointerX = event.clientX;
+      lastDragDelta = delta * 0.011; // px -> radians; tuned to feel 1:1
+      grabbed.mesh.rotation.y += lastDragDelta;
+    } else {
+      renderer.domElement.style.cursor = potUnderPointer(event) ? "grab" : "";
+    }
+  });
+  const releasePot = () => {
+    if (!grabbed) return;
+    grabbed.spin = lastDragDelta; // the flick: leave with the hand's velocity
+    grabbed = null;
+    controls.enabled = true;
+    renderer.domElement.style.cursor = "";
+  };
+  renderer.domElement.addEventListener("pointerup", releasePot);
+  renderer.domElement.addEventListener("pointerleave", releasePot);
+
+  // ---------- the inspection lamp ----------
+  // A warm handheld light that rides just in front of the pot, following the
+  // cursor — the way a potter walks a lamp across a glaze to read its depth
+  // and catch the crystals. Pure pleasure feature; costs one point light.
+  const lamp = new PointLight("#ffd9a6", 0, 5, 2);
+  scene.add(lamp);
+  let lampTarget = 0;
+  addEventListener("pointermove", (event) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointerNdc.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(pointerNdc, camera);
+    // Park the lamp along the pointer's ray, most of the way to the pot — close
+    // enough to throw a readable highlight, far enough not to clip inside it.
+    const toStage = camera.position.distanceTo(controls.target);
+    lamp.position.copy(raycaster.ray.at(toStage - 1.35, lamp.position));
+    lampTarget = 2.6;
+
+    // DOM parallax: the giant number drifts against the pot as the cursor
+    // moves — two layers of paper sliding, the cheapest depth cue there is.
+    bignumEl.style.transform = `translateX(calc(-50% + ${pointerNdc.x * -14}px)) translateY(${pointerNdc.y * 8}px)`;
+  });
 
   // ---------- chrome ----------
   const pieceTitle = (r: Recipe) => `${r.form[0]!.toUpperCase()}${r.form.slice(1)} — ${r.glaze}`;
@@ -308,6 +399,7 @@ async function main() {
     </div>
     <button class="share" id="share">copy link to this firing</button>
     <button class="share cleartable" id="clearTable" style="display:none">clear the table</button>
+    <button class="share soundtoggle" id="soundToggle">sound ${soundEnabled() ? "on" : "off"}</button>
     <div class="shelf" id="shelf">
       <p class="shelf-label">THE SHELF</p>
       <div class="shelf-items" id="shelfItems"></div>
@@ -421,10 +513,13 @@ async function main() {
     fireBtn.disabled = true;
     kilnfire.classList.remove("open");
     kilnfire.classList.add("dim");
+    startRoar(); // the pressure-roar of a kiln at temperature, swelling with the dark
     setTimeout(() => setWorkingPot({ ...recipe, seed: newFiringSeed() }), 1200);
     setTimeout(() => {
       kilnfire.classList.add("open");
       kilnfire.classList.remove("dim");
+      stopRoar();
+      tink(); // the ceramic ring of the pot being set down
     }, 1700);
     setTimeout(() => {
       kilnfire.classList.remove("open");
@@ -442,6 +537,13 @@ async function main() {
   });
   clearTableBtn.addEventListener("click", clearCompanions);
 
+  const soundBtn = chrome.querySelector<HTMLButtonElement>("#soundToggle")!;
+  soundBtn.addEventListener("click", () => {
+    setSoundEnabled(!soundEnabled());
+    soundBtn.textContent = `sound ${soundEnabled() ? "on" : "off"}`;
+    if (soundEnabled()) tink(); // instant proof it's on
+  });
+
   // ---------- resize + render loop ----------
   function resize() {
     const { clientWidth: w, clientHeight: h } = app!;
@@ -454,8 +556,38 @@ async function main() {
 
   setWorkingPot(recipe);
 
+  /** Ease-out-back: overshoots its target slightly, then settles — the feel
+   * of a pot being set down with just a little too much confidence. */
+  function easeOutBack(k: number): number {
+    const c = 1.70158;
+    const t = k - 1;
+    return 1 + (c + 1) * t * t * t + c * t * t;
+  }
+  const ENTRANCE_MS = 700;
+
   renderer.setAnimationLoop(() => {
-    stagePots.forEach((pot) => (pot.mesh.rotation.y += 0.004)); // the wheel never quite stops
+    const now = performance.now();
+    stagePots.forEach((pot) => {
+      // Spin: while grabbed the hand drives it directly; released spin decays
+      // exponentially back to the idle wheel speed (the flick's momentum).
+      if (pot !== grabbed) {
+        pot.mesh.rotation.y += pot.spin;
+        pot.spin += (IDLE_SPIN - pot.spin) * 0.025;
+      }
+      // Entrance: rise out of the pedestal and settle with a slight overshoot.
+      const age = (now - pot.bornAt) / ENTRANCE_MS;
+      if (age < 1) {
+        const k = easeOutBack(age);
+        pot.mesh.position.y = -0.35 * (1 - k);
+        pot.mesh.scale.setScalar(0.94 + 0.06 * k);
+      } else {
+        pot.mesh.position.y = 0;
+        pot.mesh.scale.setScalar(1);
+      }
+    });
+    // The inspection lamp breathes in when the cursor moves, out when it rests.
+    lamp.intensity += (lampTarget - lamp.intensity) * 0.08;
+    lampTarget *= 0.985; // no movement -> the lamp is set down again
     controls.update();
     renderer.render(scene, camera);
   });

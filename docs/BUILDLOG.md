@@ -201,3 +201,26 @@ noise) renders pixel-equivalent under `forceWebGL: true` — the plugin's backen
 Cost note: the rim cap sets a sample-density floor (~350 profile points, ~86k triangles
 per pot). Fine for this scene; if the 3×3 test-tile export ever drags, the honest lever
 is radialSegments, not profile density (the rim needs it).
+
+## 11. Interactivity: instrument, not story page
+
+Researched current Awwwards-tier three.js work; the winning grammar for a single hero
+object is weight, light, and choreography — not scroll narratives (deliberately
+rejected: Kiln is an instrument you play, not a page you read). Four additions:
+
+- **Spin the pot like a wheel.** Dragging empty space orbits the camera; dragging THE
+  POT grabs it (raycast hit → OrbitControls disabled, cursor becomes a hand). It
+  follows your drag 1:1, and a flick releases with momentum that decays back to the
+  idle wheel speed — a wheel head keeps turning after you take your hand off.
+- **The inspection lamp.** A warm point light rides the cursor's ray just in front of
+  the pot — the way a potter walks a lamp across a glaze to read its depth. It breathes
+  in when the cursor moves and sets itself down when the cursor rests.
+- **Entrance.** Each new pot rises out of the pedestal and settles with a slight
+  ease-out-back overshoot — set down with a little too much confidence.
+- **Sound, synthesized from scratch** (no audio files, same rule as textures/env):
+  the firing's kiln roar is brown noise through a lowpass swelling with the dark; the
+  reveal plays the modal ring of struck stoneware (two detuned high partials, fast
+  exponential decay). Toggleable, persisted, gesture-gated by construction.
+
+Plus DOM parallax: the giant firing number drifts against the pot as the cursor moves —
+two layers of paper sliding, the cheapest depth cue there is.
