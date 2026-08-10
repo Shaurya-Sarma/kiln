@@ -366,7 +366,9 @@ body,
   left: 38px;
   bottom: 22px;
   z-index: 20;
-  max-width: min(46vw, 560px);
+  /* Five pots wide, no more — past that the strip crowds the placard and the
+     rest is a swipe away: 5 x 68px items + 4 x 10px gaps + container padding. */
+  max-width: 392px;
 }
 
 .shelf-label {
