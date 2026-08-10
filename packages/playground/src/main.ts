@@ -498,7 +498,7 @@ async function main() {
     <button class="share soundtoggle" id="soundToggle">sound ${soundEnabled() ? "on" : "off"}</button>
     <p class="credit">
       made by <a href="https://shaux.dev" target="_blank" rel="noopener">shaurya sarma</a>
-      · <a href="https://github.com/Shaurya-Sarma" target="_blank" rel="noopener">github</a>
+      · <a href="https://github.com/Shaurya-Sarma/kiln" target="_blank" rel="noopener">github</a>
     </p>
     <div class="shelf" id="shelf">
       <p class="shelf-label">THE SHELF</p>
