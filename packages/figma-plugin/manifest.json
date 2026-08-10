@@ -1,5 +1,6 @@
 {
   "name": "Kiln",
+  "id": "1668530142333231651",
   "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",
