@@ -5,6 +5,7 @@ export { buildPotGeometry } from "./pot.js";
 export type { PotGeometryOptions } from "./pot.js";
 export { mulberry32, newFiringSeed, firingLabel } from "./rng.js";
 export {
+  colorantTint,
   createAshMaterial,
   createCeladonMaterial,
   createCopperRedMaterial,

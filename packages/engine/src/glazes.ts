@@ -110,6 +110,22 @@ const COLORANT_SHIFT: Record<Colorant, { hue: number; sat: number }> = {
   rutile: { hue: -0.35, sat: 0.8 },
 };
 
+/**
+ * The same oxide shift, applied to a plain CSS colour on the CPU — for
+ * thumbnails, swatches, anything that previews a glaze without running the
+ * shader. Sharing the COLORANT_SHIFT table is what keeps a pot's shelf sketch
+ * and the pot itself from ever disagreeing about what cobalt means.
+ */
+export function colorantTint(hex: string, colorant: Colorant): string {
+  if (colorant === "iron") return hex;
+  const shift = COLORANT_SHIFT[colorant];
+  const c = new Color(hex);
+  const hsl = { h: 0, s: 0, l: 0 };
+  c.getHSL(hsl);
+  c.setHSL((hsl.h + shift.hue / (Math.PI * 2)) % 1, Math.min(hsl.s * shift.sat, 1), hsl.l);
+  return `#${c.getHexString()}`;
+}
+
 /** Wrap a glaze's final colour in its colorant. Identity for iron — the
  * shader graph stays untouched for the traditional recipes. */
 function withColorant(node: Node<"vec3">, colorant: Colorant): Node<"vec3"> {

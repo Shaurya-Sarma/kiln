@@ -12,7 +12,7 @@
  * canvas-readback timing questions.
  */
 
-import { PRESETS, type Atmosphere, type Colorant, type PresetName, sampleProfile } from "@kiln/engine";
+import { PRESETS, type Atmosphere, type Colorant, type PresetName, colorantTint, sampleProfile } from "@kiln/engine";
 
 export type GlazeName = "celadon" | "crystalline" | "tenmoku" | "shino" | "copper-red" | "ash";
 
@@ -86,7 +86,12 @@ export function sketchThumbnail(recipe: Recipe, size = 96): string {
   const cx = size / 2;
   const baseY = size / 2 + (maxHeight * scale) / 2;
 
-  const tint = GLAZE_TINTS[recipe.glaze];
+  const base = GLAZE_TINTS[recipe.glaze];
+  // The sketch wears the pot's own oxide — a cobalt pot gets a cobalt sketch.
+  const tint = {
+    fill: colorantTint(base.fill, recipe.colorant),
+    ink: colorantTint(base.ink, recipe.colorant),
+  };
   ctx.beginPath();
   // Right wall up...
   sampled.points.forEach((p, i) => {
