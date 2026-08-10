@@ -33,8 +33,11 @@ import {
   type PresetName,
   type Profile,
   buildPotGeometry,
+  createAshMaterial,
   createCeladonMaterial,
+  createCopperRedMaterial,
   createCrystallineMaterial,
+  createShinoMaterial,
   createTenmokuMaterial,
   firingLabel,
   newFiringSeed,
@@ -49,6 +52,9 @@ const GLAZES = {
   celadon: (s: FiringParams) => createCeladonMaterial(s),
   crystalline: (s: FiringParams) => createCrystallineMaterial(s),
   tenmoku: (s: FiringParams) => createTenmokuMaterial(s),
+  shino: (s: FiringParams) => createShinoMaterial(s),
+  "copper-red": (s: FiringParams) => createCopperRedMaterial(s),
+  ash: (s: FiringParams) => createAshMaterial(s),
 };
 
 function post(message: UiMessage, transfer?: Transferable[]) {

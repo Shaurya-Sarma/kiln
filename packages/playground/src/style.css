@@ -424,14 +424,103 @@ body,
   color: var(--brick);
 }
 
-.cleartable {
-  bottom: 54px;
-}
-
 .soundtoggle {
-  bottom: 78px;
+  bottom: 54px;
 }
 
 .bignum {
   transition: transform 0.4s cubic-bezier(0.2, 0.6, 0.3, 1);
+}
+
+/* ---------- the mark (hand-cut vase, also the favicon) ---------- */
+.masthead h1 {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.masthead .mark {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+/* ---------- ?debug=sound — the audition board ---------- */
+.soundboard {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 34px 24px 60px;
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--ink);
+}
+
+.soundboard-title {
+  font-family: Fraunces Variable, Fraunces, serif;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  margin: 0 0 4px;
+}
+
+.soundboard-note {
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+  margin: 0 0 18px;
+}
+
+.soundboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.soundboard-cell {
+  display: block;
+  text-align: left;
+  padding: 9px 11px;
+  border: 1px dashed var(--line);
+  background: var(--paper-raised);
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+}
+
+.soundboard-cell:hover {
+  border-color: var(--brick);
+}
+
+.soundboard-cell b {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.soundboard-cell i {
+  display: block;
+  font-family: Fraunces Variable, Fraunces, serif;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.soundboard-cell u {
+  display: block;
+  margin-top: 3px;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--ink-faint);
+}
+
+.soundboard-spin {
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+  font-size: 10px;
+}
+
+.soundboard-spin input {
+  display: block;
+  width: 100%;
+  margin: 8px 0 10px;
 }

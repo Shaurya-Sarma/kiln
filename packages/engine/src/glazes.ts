@@ -31,7 +31,8 @@ import {
   uv,
   vec3,
 } from "three/tsl";
-import { crystallineTexture, oilSpotTexture } from "./textures.js";
+import { ashTexture, copperRedTexture, crystallineTexture, oilSpotTexture, shinoTexture } from "./textures.js";
+import { mulberry32 } from "./rng.js";
 
 /**
  * How far light travels through the glaze layer before it comes back out.
@@ -75,9 +76,11 @@ function absorbed(thickness: ReturnType<typeof viewPathMultiplier>, opacity: num
  * module learned the hard way (see textures.ts), enforced here by geometry
  * rather than by care.
  */
-function surfaceNoise(around: number, upward: number) {
+function surfaceNoise(around: number, upward: number, shift = 0) {
   const theta = uv().x.mul(Math.PI * 2);
-  const ring = vec3(theta.cos().mul(around), theta.sin().mul(around), uv().y.mul(upward));
+  // `shift` slides the sampling window along the axis: seed-derived shifts are
+  // how the SAME noise field gives every firing different speckle placement.
+  const ring = vec3(theta.cos().mul(around), theta.sin().mul(around), uv().y.mul(upward).add(shift));
   return mx_noise_float(ring).mul(0.5).add(0.5); // MaterialX noise is signed
 }
 
@@ -113,11 +116,18 @@ export type FiringParams = GlazeParams & {
  * `mix(thin, pooled, pooling)` was missing, and it is most of the difference
  * between "pale green plastic" and "glass with something dissolved in it".
  */
-export function createCeladonMaterial({ atmosphere }: GlazeParams): MeshPhysicalNodeMaterial {
+export function createCeladonMaterial({ atmosphere, seed }: GlazeParams): MeshPhysicalNodeMaterial {
+  // The seed is the kiln's fingerprint, and celadon must carry it too: dip
+  // thickness varies (nobody dips identically twice), speckles land elsewhere,
+  // and the fired hue drifts with kiln position. Without this, "fire again"
+  // on the DEFAULT glaze produced an identical pot — the thesis, broken
+  // exactly where a first-time visitor tests it.
+  const kiln = mulberry32(seed ^ 0xce1ad);
+  const drift = (kiln() - 0.5) * 0.22; // warmer or cooler corner of the kiln
   const palette =
     atmosphere === "reduction"
-      ? { thin: new Color("#dee7dc"), pooled: new Color("#2f6d55") }
-      : { thin: new Color("#eee0be"), pooled: new Color("#8c6320") };
+      ? { thin: new Color("#dee7dc"), pooled: new Color("#2f6d55").lerp(new Color("#2f5d75"), drift + 0.11) }
+      : { thin: new Color("#eee0be"), pooled: new Color("#8c6320").lerp(new Color("#a4491f"), drift + 0.11) };
   // Iron speckle in the stoneware body, visible only through thin glaze.
   const clayBody = new Color("#8d7357");
 
@@ -137,16 +147,19 @@ export function createCeladonMaterial({ atmosphere }: GlazeParams): MeshPhysical
   const foot = smoothstep(float(0.3), float(0.0), v).mul(0.55);
   const poolAmount = grooves.add(foot).clamp(0, 1);
 
-  // Applied thickness: a dipped coat everywhere, plus wherever it pooled. Then
-  // stretch it by the viewing angle and let the melt absorb along that path.
-  const APPLIED_COAT = 0.52;
-  const thickness = poolAmount.mul(1.5).add(APPLIED_COAT).mul(viewPathMultiplier());
+  // Applied thickness: a dipped coat everywhere — but no two dips are equal
+  // (this firing's coat is scaled by the seed), plus broad soft patches where
+  // the dip ran thick, plus wherever gravity pooled it. Then stretch by the
+  // viewing angle and let the melt absorb along that path.
+  const APPLIED_COAT = 0.52 * (0.82 + kiln() * 0.4);
+  const dipPatches = surfaceNoise(2.2, 6, kiln() * 73).sub(0.5).mul(0.5);
+  const thickness = poolAmount.mul(1.5).add(APPLIED_COAT).add(dipPatches).max(0.12).mul(viewPathMultiplier());
   const depth = absorbed(thickness, 1.0);
 
   // Where the coat is thinnest, the speckled stoneware underneath shows through
   // as faint iron freckles — the tell that there is a clay body under the glass
   // and not just coloured plastic.
-  const speckle = smoothstep(float(0.64), float(0.88), surfaceNoise(11, 52)).mul(oneMinus(depth)).mul(0.34);
+  const speckle = smoothstep(float(0.64), float(0.88), surfaceNoise(11, 52, kiln() * 97)).mul(oneMinus(depth)).mul(0.34);
 
   material.colorNode = mix(mix(color(palette.thin), color(palette.pooled), depth), color(clayBody), speckle);
 
@@ -246,5 +259,94 @@ export function createTenmokuMaterial({ atmosphere, seed }: GlazeParams): MeshPh
   // black around them. Without this they read as painted-on dots.
   material.roughnessNode = float(0.3).add(spots.a.mul(0.22));
 
+  return material;
+}
+
+/**
+ * Shino — the glaze that does what it wants.
+ *
+ * A thick feldspathic white that blushes orange where the flame licked it and
+ * traps grey carbon where reduction smoke got sealed under the melt. Famously
+ * uncallable before the kiln opens, which makes it this app's thesis glaze.
+ * All the event placement lives in the seeded texture; the material's job is
+ * shino's SKIN: satin, not glassy — a thick coat that ate its own shine.
+ */
+export function createShinoMaterial(params: GlazeParams): MeshPhysicalNodeMaterial {
+  const material = new MeshPhysicalNodeMaterial();
+  // Lathe walls have no thickness (a deliberate scope cut) — render both faces
+  // so open forms like bowls show their inside.
+  material.side = DoubleSide;
+  const kiln = mulberry32(params.seed ^ 0x5711);
+
+  const blushes = texture(shinoTexture(params));
+  // Where the coat thins over ridges and the rim, shino toasts orange — the
+  // same geometry facts tenmoku uses, warmed instead of rusted.
+  const pooling = attribute<"float">("aPooling", "float");
+  const toastRidges = smoothstep(float(0.18), float(0.6), min(pooling, 0).negate());
+  const toast = toastRidges.mul(0.8).add(smoothstep(float(0.88), float(1.0), uv().y).mul(0.5)).clamp(0, 1);
+  material.colorNode = mix(blushes.rgb, blushes.rgb.mul(vec3(1.12, 0.82, 0.6)), toast);
+
+  material.roughness = 0.42;
+  material.clearcoat = 0.35;
+  material.clearcoatRoughnessNode = float(0.3).add(surfaceNoise(6, 30, kiln() * 83).mul(0.25));
+  return material;
+}
+
+/**
+ * Copper red (oxblood) — the atmosphere glaze.
+ *
+ * One recipe, two pots: starve the kiln of oxygen and copper turns blood-red
+ * with violet flambé veils; give it air and the same copper settles into a
+ * quiet green. The rim breaks pale where the red ran thin — the classic
+ * "white lip" of an oxblood — using the same geometry facts as tenmoku's rust.
+ */
+export function createCopperRedMaterial(params: GlazeParams): MeshPhysicalNodeMaterial {
+  const material = new MeshPhysicalNodeMaterial();
+  // Lathe walls have no thickness (a deliberate scope cut) — render both faces
+  // so open forms like bowls show their inside.
+  material.side = DoubleSide;
+  const kiln = mulberry32(params.seed ^ 0xb100d);
+
+  const base = texture(copperRedTexture(params));
+  const pooling = attribute<"float">("aPooling", "float");
+  // Deadzone on the ridge term: a gently convex belly is NOT a ridge, and
+  // without the threshold the whole body washed pale. Only genuinely sharp
+  // convexity (the lip roll, the foot turn) lets the red run thin.
+  const ridges = smoothstep(float(0.18), float(0.6), min(pooling, 0).negate());
+  const lip = ridges.mul(0.9).add(smoothstep(float(0.86), float(1.0), uv().y).mul(0.85)).clamp(0, 1);
+  const lipColor = params.atmosphere === "reduction" ? new Color("#ded2c2") : new Color("#e7e3d2");
+  material.colorNode = mix(base.rgb, color(lipColor), lip.mul(0.8));
+
+  // Oxblood is deep wet glass; the oxidation green is drier, closer to satin.
+  const glassy = params.atmosphere === "reduction";
+  material.roughness = glassy ? 0.14 : 0.34;
+  material.clearcoat = glassy ? 1.0 : 0.5;
+  material.clearcoatRoughnessNode = float(glassy ? 0.1 : 0.26).add(surfaceNoise(4, 18, kiln() * 59).mul(0.18));
+  return material;
+}
+
+/**
+ * Ash — gravity made visible.
+ *
+ * Wood ash melts into runny green-amber glass that rivulets down the wall.
+ * The seeded texture carries the drips; the material deepens wherever the
+ * geometry pools (drips and grooves agree: that is where the glass is thick)
+ * and keeps a coarse, orchard-fired skin.
+ */
+export function createAshMaterial(params: GlazeParams): MeshPhysicalNodeMaterial {
+  const material = new MeshPhysicalNodeMaterial();
+  // Lathe walls have no thickness (a deliberate scope cut) — render both faces
+  // so open forms like bowls show their inside.
+  material.side = DoubleSide;
+  const kiln = mulberry32(params.seed ^ 0xa511e);
+
+  const runs = texture(ashTexture(params));
+  const pooling = max(attribute<"float">("aPooling", "float"), 0);
+  // Thick ash glass goes deep olive — multiply toward green rather than black.
+  material.colorNode = mix(runs.rgb, runs.rgb.mul(vec3(0.55, 0.72, 0.45)), pooling.mul(0.8).clamp(0, 1));
+
+  material.roughness = 0.3;
+  material.clearcoat = 0.7;
+  material.clearcoatRoughnessNode = float(0.18).add(surfaceNoise(5, 24, kiln() * 71).mul(0.24));
   return material;
 }

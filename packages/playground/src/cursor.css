@@ -1,0 +1,353 @@
+/*
+ * Kiln — the studio cursor.
+ *
+ * One chunky, bold-outlined pointer arrow. A state changes exactly two things:
+ * the arrow's FILL (outline-only -> soft tint -> solid, the icon set's three
+ * weights) and which of its two accents is showing (a sparkle burst off the
+ * shoulder, click ripples behind the tail). Nothing here swaps in a different
+ * shape, and nothing deforms.
+ *
+ * All colour flows through --cc-ink / --cc-fill / --cc-accent on the root, so a
+ * state is a couple of custom-property overrides rather than a second copy of
+ * the artwork. (SVG presentation attributes can't read var(), which is why the
+ * paths carry classes and get their paint from here.)
+ *
+ * Everything is SVG/CSS from the studio palette — no images, no deps. The
+ * follower is inert by construction (pointer-events: none, zero-size root), so
+ * it can never eat a click no matter how large a state draws.
+ */
+
+/* Native cursor goes away only once the follower is actually running — the
+   class is added by cursor.ts, which bails out on touch and reduced-motion.
+   That ordering is the whole guardrail: if the system is off, the browser's
+   own cursor is untouched. */
+html.cc-on,
+html.cc-on * {
+  cursor: none;
+}
+
+/* ...except where a custom follower actively breaks the control. A <select>
+   popup and a range thumb are drawn and driven by the OS; a lagging icon
+   next to them reads as "this widget is broken". They keep real cursors. */
+html.cc-on select,
+html.cc-on select * {
+  cursor: pointer;
+}
+
+html.cc-on input[type="range"] {
+  cursor: ew-resize;
+}
+
+html.cc-on input,
+html.cc-on textarea {
+  cursor: auto;
+}
+
+/* ---------- the follower ---------- */
+
+/* Above .grain (40) AND above .kilnfire (50): during a firing the room is
+   dark, and the cursor still has to be findable in it. Safe to sit on top of
+   everything because nothing here takes pointers. */
+.kilncursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 60;
+  pointer-events: none;
+  will-change: transform;
+
+  --cc-ink: #2b2118;
+  --cc-fill: #faf7f1;
+  --cc-accent: #2b2118;
+}
+
+/* Three nested transform stages, so they never fight over one property:
+   .kilncursor = position (JS, per frame)
+   .cc-press   = the click nudge (class-driven)
+   .cc-tilt    = drag lean (JS, per frame)
+   Both inner stages are zero-size divs, so their default transform-origin IS
+   the hotspot — a press or a tilt pivots about the tip rather than walking it
+   off the pixel the user believes they're clicking. */
+.cc-press {
+  transition: transform 0.13s cubic-bezier(0.3, 1.4, 0.4, 1);
+}
+
+.kilncursor.is-press .cc-press {
+  transform: scale(0.92);
+}
+
+.cc-tilt {
+  transform: rotate(var(--cc-tilt, 0deg));
+}
+
+/* Layers are anchored on the hotspot with negative MARGINS, not with the
+   standalone `translate` property. `translate` looks cleaner and composes with
+   `transform` in the browser, but the production CSS minifier folds it into
+   `transform` — where each rule's own `scale()` then silently overwrote it, and
+   every layer drew offset from the hotspot by half its size. Margins are
+   layout, so nothing can merge them away. */
+.kilncursor i {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 0.16s ease,
+    transform 0.24s cubic-bezier(0.3, 1.5, 0.4, 1);
+}
+
+/* Accents deliberately overhang their own boxes (the sparkle sits outside the
+   shoulder, the ripples wrap past the tail), so nothing may clip. */
+.kilncursor i svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.kilncursor .cc-arrow-ink {
+  fill: var(--cc-ink);
+  stroke: var(--cc-ink);
+}
+
+.kilncursor .cc-arrow-fill {
+  fill: var(--cc-fill);
+  stroke: var(--cc-fill);
+}
+
+.kilncursor .cc-spark-ink {
+  stroke: var(--cc-accent);
+}
+
+.kilncursor .cc-ripple-arc {
+  stroke: var(--cc-accent);
+}
+
+/* The arrow is the one layer that is always drawn. Its margin puts the drawn
+   TIP on the hotspot — the viewBox tip vertex is (5, 4.4) of 34x36, rendered at
+   28px wide, so the tip lands ~3.5px right and ~2.4px down of the box origin. */
+.kilncursor .cc-arrow {
+  width: 28px;
+  height: 29.6px;
+  margin: -2.4px 0 0 -3.5px;
+  opacity: 1;
+  transform: scale(1);
+  /* Any growth happens from the TIP, not the middle of the drawing: scaling
+     about the centre would walk the tip off the hotspot. */
+  transform-origin: 3.5px 2.4px;
+  filter: drop-shadow(1px 2px 2px rgba(43, 33, 24, 0.26));
+  transition:
+    opacity 0.18s ease,
+    filter 0.22s ease;
+}
+
+/* Same viewBox and same offset as the arrow, so the burst's coordinates are
+   literally the arrow's coordinates — the dashes can be placed against the
+   shoulder by eye in one shared space. It pops from the burst's own origin
+   rather than from the box centre. */
+.kilncursor .cc-spark {
+  width: 28px;
+  height: 29.6px;
+  margin: -2.4px 0 0 -3.5px;
+  transform-origin: 21.8px 9.5px;
+}
+
+/* The ripples get their own viewBox: they live entirely outside the arrow's
+   box, off the tail, and folding them in would mean either clipping them or
+   shrinking the arrow to make room. Pops from the arcs' shared centre. */
+.kilncursor .cc-ripples {
+  width: 24.7px;
+  height: 32.9px;
+  /* Down and out from the tail, not level with the shoulder: parked at the
+     arrow's flank the arcs read as a speaker icon's sound waves. They have to
+     trail off the back — which, for an arrow aimed up-left, is down-right. */
+  margin: 11px 0 0 12.7px;
+  transform-origin: 3.3px 16.5px;
+}
+
+.kilncursor .cc-hint {
+  left: 27px;
+  top: 4px;
+  width: max-content;
+  height: auto;
+  padding: 3px 6px 2.5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-soft, #6b5d4f);
+  background: rgba(250, 247, 241, 0.92);
+  border: 1px dashed var(--line, rgba(107, 93, 79, 0.35));
+  white-space: nowrap;
+}
+
+/* ---------- states ---------- */
+/* Each state is a fill weight plus an accent, so it's a selector — not a branch
+   in the render loop, and not a different sprite. */
+
+/* Over the pot: the arrow warms to a celadon tint (the default glaze on the
+   shelf) and the sparkle says there's something here to take hold of. */
+.kilncursor[data-cc="touch"] {
+  --cc-fill: #cfdccc;
+}
+
+/* Every "there is something here" state shares one sparkle, which is what holds
+   the family together across the three fill weights.
+   Note what `control` does NOT get: a fill change. A button is a target, not a
+   material, so the accent alone carries it — otherwise hovering the UI would
+   read as a bigger event than touching the actual work. */
+.kilncursor[data-cc="touch"] .cc-spark,
+.kilncursor[data-cc="control"] .cc-spark,
+.kilncursor[data-cc="ember"] .cc-spark {
+  opacity: 1;
+  animation: cc-twinkle 2s ease-in-out infinite;
+}
+
+.kilncursor[data-cc="touch"] .cc-hint {
+  /* Type, not artwork — it must not inherit the pop-in scale, or it renders as
+     an unreadable 4px smudge beside the cursor. */
+  opacity: 1;
+  transform: none;
+}
+
+/* Turning a pot: the solid weight of the set, plus the ripples reading as
+   contact and motion. The lean comes from the drag itself (cursor.ts).
+   Solid in clay brown rather than in the ink itself — filling with --cc-ink
+   collapses the outline into the body, and the arrow stops being a member of a
+   set with a dark outline and becomes an undifferentiated black shape. */
+.kilncursor[data-cc="grip"] {
+  --cc-fill: #6b5d4f;
+}
+
+.kilncursor[data-cc="grip"] .cc-ripples {
+  opacity: 0.7;
+  animation: cc-wash 1.5s ease-in-out infinite;
+}
+
+/* The FIRE button: solid kiln-brick. The sparkle keeps the ink accent rather
+   than going warm, because the button underneath is already brick and a brick
+   sparkle on it would disappear. */
+.kilncursor[data-cc="ember"] {
+  --cc-fill: #b0492e;
+}
+
+/* Firing: the gallery is dark and you are outside the kiln, so the arrow drops
+   to a faint warm outline. The fill goes to the room's own colour (the same
+   #120b07 .kilnfire paints) instead of `none` — an unfilled arrow would show
+   the glowing kiln door through its middle and stop reading as one solid
+   object. */
+.kilncursor[data-cc="dim"] {
+  --cc-ink: rgba(255, 205, 160, 0.5);
+  --cc-fill: #120b07;
+  /* The overlay takes pointer events while it's up, so a click during a firing
+     still fires and still pulses the ripples. They have to be lit for the dark
+     room like everything else here — left on the ink accent they pulsed
+     invisibly, which is worse than not pulsing. */
+  --cc-accent: rgba(255, 205, 160, 0.45);
+}
+
+.kilncursor[data-cc="dim"] .cc-arrow {
+  opacity: 0.62;
+  filter: none;
+}
+
+/* Over a native control, the follower steps off the stage entirely. */
+.kilncursor[data-cc="native"] {
+  opacity: 0;
+}
+
+/* The click pulse: the same two arcs, thrown outward once. A running animation
+   outranks a plain declaration, so this simply wins for its half second and
+   then hands the layer back to whatever the state was already saying — which is
+   how one motif covers both "you clicked" and "you're holding a pot". */
+.kilncursor .cc-ripples.is-poked {
+  animation: cc-pulse 0.5s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@keyframes cc-pulse {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.42);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.34);
+  }
+}
+
+/* Held ripples breathe instead of expanding: an expanding ring reads as a
+   repeated click, and a held grip is one continuous event. */
+@keyframes cc-wash {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+}
+
+/* Shallow and slow on purpose: the sparkle is a label, and a label that
+   strobes is a distraction sitting 20px from whatever you're reading. */
+@keyframes cc-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  46% {
+    opacity: 0.72;
+    transform: scale(0.9);
+  }
+}
+
+/* ---------- ?debug=cursor board ---------- */
+/* A headless screenshot can't photograph a cursor, so the states are pinned
+   out as a contact sheet instead — one image reviews the whole set. */
+.cc-board {
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  pointer-events: none;
+  background: rgba(244, 241, 236, 0.86);
+}
+
+.cc-board-title {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  translate: -50% 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-soft, #6b5d4f);
+}
+
+.cc-cell-label {
+  position: absolute;
+  translate: -50% 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint, #a1927f);
+  white-space: nowrap;
+}
+
+/* The dark states have to be reviewed against the dark room they live in. */
+.cc-cell-plate {
+  position: absolute;
+  translate: -50% -50%;
+  width: 190px;
+  height: 130px;
+  background: #120b07;
+  border: 1px solid rgba(255, 205, 160, 0.2);
+}

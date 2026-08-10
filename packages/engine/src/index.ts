@@ -4,9 +4,16 @@ export { studioEnvironment } from "./studio.js";
 export { buildPotGeometry } from "./pot.js";
 export type { PotGeometryOptions } from "./pot.js";
 export { mulberry32, newFiringSeed, firingLabel } from "./rng.js";
-export { createCeladonMaterial, createCrystallineMaterial, createTenmokuMaterial } from "./glazes.js";
+export {
+  createAshMaterial,
+  createCeladonMaterial,
+  createCopperRedMaterial,
+  createCrystallineMaterial,
+  createShinoMaterial,
+  createTenmokuMaterial,
+} from "./glazes.js";
 export type { Atmosphere, GlazeParams, FiringParams } from "./glazes.js";
 export { PRESETS } from "./presets.js";
-export { crystallineTexture, oilSpotTexture } from "./textures.js";
-export type { CrystallineParams, OilSpotParams } from "./textures.js";
+export { ashTexture, copperRedTexture, crystallineTexture, oilSpotTexture, shinoTexture } from "./textures.js";
+export type { CrystallineParams, OilSpotParams, SeededGlazeParams } from "./textures.js";
 export type { PresetName } from "./presets.js";

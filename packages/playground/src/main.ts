@@ -15,9 +15,9 @@ import "@fontsource/ibm-plex-mono/500.css";
 import {
   ACESFilmicToneMapping,
   CircleGeometry,
-  CylinderGeometry,
   DirectionalLight,
   Group,
+  LatheGeometry,
   type Material,
   Mesh,
   MeshStandardMaterial,
@@ -34,8 +34,11 @@ import {
   PRESETS,
   type PresetName,
   buildPotGeometry,
+  createAshMaterial,
   createCeladonMaterial,
+  createCopperRedMaterial,
   createCrystallineMaterial,
+  createShinoMaterial,
   createTenmokuMaterial,
   type Atmosphere,
   firingLabel,
@@ -44,18 +47,59 @@ import {
   studioEnvironment,
 } from "@kiln/engine";
 import { type GlazeName, type Recipe, type ShelfEntry, loadShelf, saveShelf, sketchThumbnail } from "./shelf.js";
-import { setSoundEnabled, soundEnabled, startRoar, stopRoar, tink } from "./audio.js";
+import {
+  clayGrab,
+  dialStep,
+  emberWhisper,
+  flickRelease,
+  kilnDoor,
+  potSettle,
+  setSoundEnabled,
+  setSpinRate,
+  shelfLift,
+  shelfPlace,
+  shelfRemove,
+  soundEnabled,
+  stamp,
+  startRoar,
+  stopRoar,
+  tink,
+  uiTick,
+} from "./audio.js";
+import { initCursor, setPotGrip } from "./cursor.js";
 import "./style.css";
 
 const GLAZES: Record<GlazeName, (r: Recipe) => Material> = {
   celadon: (r) => createCeladonMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
   crystalline: (r) => createCrystallineMaterial({ atmosphere: r.atmosphere, seed: r.seed, holdMinutes: r.holdMinutes }),
   tenmoku: (r) => createTenmokuMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
+  shino: (r) => createShinoMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
+  "copper-red": (r) => createCopperRedMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
+  ash: (r) => createAshMaterial({ atmosphere: r.atmosphere, seed: r.seed }),
 };
 
 async function main() {
   const app = document.querySelector<HTMLDivElement>("#app");
   if (!app) throw new Error("missing #app");
+
+  // ?debug=cursor — the cursor contact sheet: every follower state pinned out as
+  // artwork, because a screenshot cannot photograph a cursor. It has to return
+  // BEFORE the renderer: the sheet is pure DOM and needs no 3D, and gating it
+  // behind `await renderer.init()` made it unreachable on any machine without
+  // WebGPU (headless Chrome included), where that promise simply never settles.
+  if (new URLSearchParams(location.search).get("debug") === "cursor") {
+    initCursor();
+    return;
+  }
+
+  // ?debug=sound — the audition board: every sound in the palette with a button
+  // to trigger it, plus a spin-rate slider for the continuous wheel loop. You
+  // cannot hear a screenshot, so this is how the sound design gets checked.
+  if (new URLSearchParams(location.search).get("debug") === "sound") {
+    const { mountSoundBoard } = await import("./sound-board.js");
+    mountSoundBoard(app);
+    return;
+  }
 
   // ?debug=texture — show the raw crystalline canvas flat, for hunting seams
   // and tuning bloom density without the 3D projection in the way.
@@ -184,22 +228,58 @@ async function main() {
   // rig came down — at which point the pedestal dissolved into the background
   // and left the pot floating. A plinth only does its job if its silhouette
   // reads against the wall behind it.
+  //
+  // The plinth is a revolved profile rather than a cylinder, because a cylinder's
+  // edges are the tell. Its top rim is a mathematically sharp ring, so the key
+  // light resolves it as one hard line and the whole form flattens to a shape.
+  // Cast plaster has a small radius wherever it left the mould, and that radius
+  // is what produces the thin travelling highlight along the top edge that reads
+  // as a solid object. Same silhouette and the same two values as before — the
+  // change is entirely in how the edges catch light.
   const PEDESTAL_TOP = 0;
+  const PEDESTAL_BOTTOM = -1.1;
+  const TOP_RADIUS = 1.15;
+  const BOTTOM_RADIUS = 1.2; // the slight taper that keeps it from looking like a pipe
+  const EDGE_RADIUS = 0.045; // the mould-release radius on the top and base edges
+
+  /** Points along a circular arc about (cx, cy), for building a fillet. */
+  const arc = (cx: number, cy: number, r: number, from: number, to: number, steps: number) =>
+    Array.from({ length: steps + 1 }, (_, i) => {
+      const angle = from + ((to - from) * i) / steps;
+      return new Vector2(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+    });
+
+  // Bottom-centre up and over to top-centre. The straight body is implicit: lathe
+  // joins consecutive points, so the gap between the two fillets IS the taper,
+  // and no point is repeated (a duplicate would revolve into a degenerate ring
+  // whose zero-area faces produce NaN normals).
+  const pedestalProfile = [
+    new Vector2(0, PEDESTAL_BOTTOM),
+    ...arc(BOTTOM_RADIUS - EDGE_RADIUS, PEDESTAL_BOTTOM + EDGE_RADIUS, EDGE_RADIUS, -Math.PI / 2, 0, 8),
+    ...arc(TOP_RADIUS - EDGE_RADIUS, PEDESTAL_TOP - EDGE_RADIUS, EDGE_RADIUS, 0, Math.PI / 2, 8),
+    new Vector2(0, PEDESTAL_TOP),
+  ];
   const pedestal = new Mesh(
-    new CylinderGeometry(1.15, 1.2, 1.1, 64),
+    // 192 segments, not 64. The plinth fills a third of the frame, and at 64 the
+    // silhouette's flat spots are visible against the paper at this size.
+    new LatheGeometry(pedestalProfile, 192),
     new MeshStandardMaterial({ color: "#d8cebc", roughness: 0.88 }),
   );
-  pedestal.position.y = PEDESTAL_TOP - 0.55;
   pedestal.castShadow = pedestal.receiveShadow = true;
   const floor = new Mesh(
-    new CircleGeometry(30).rotateX(-Math.PI / 2),
+    new CircleGeometry(30, 128).rotateX(-Math.PI / 2),
     new MeshStandardMaterial({ color: "#e0d8ca", roughness: 0.96 }),
   );
-  floor.position.y = PEDESTAL_TOP - 1.1;
+  floor.position.y = PEDESTAL_BOTTOM;
   floor.receiveShadow = true;
   scene.add(pedestal, floor);
 
-  // ---------- pots on stage (index 0 = the working pot; 1..2 = companions) ----------
+  // ---------- the pot on stage ----------
+  // Exactly one, always at the center of the plinth. Firing a new pot or loading
+  // one off the shelf replaces it. There used to be a "+table" action that stood
+  // up to two companions from the shelf alongside it, at x = ±1.55; it is gone
+  // deliberately, because the pedestal only reads as an exhibit when there is a
+  // single thing on it, and companions turned the composition into a shop window.
   const stage = new Group();
   // A hair above the pedestal, not exactly on it. The pots stand on a trimmed
   // foot ring whose contact pad is dead flat at y = 0, which would be coplanar
@@ -207,7 +287,6 @@ async function main() {
   // pixel of separation, and the shadow still lands where the foot is.
   stage.position.y = PEDESTAL_TOP + 0.004;
   scene.add(stage);
-  const STAND_X = [0, -1.55, 1.55];
 
   type StagePot = {
     mesh: Mesh;
@@ -231,47 +310,22 @@ async function main() {
     return mesh;
   }
 
-  function layoutStage() {
-    stagePots.forEach((pot, i) => {
-      pot.mesh.position.x = STAND_X[i] ?? 0;
-    });
-  }
-
   function removeStagePot(pot: StagePot) {
     pot.mesh.geometry.dispose();
     (pot.mesh.material as Material).dispose();
     stage.remove(pot.mesh);
   }
 
+  // The only writer of `stagePots`, and it always leaves exactly one pot in it —
+  // which is what keeps "one pot on the plinth" true rather than merely tidy.
   function setWorkingPot(r: Recipe) {
-    const old = stagePots[0];
-    if (old) removeStagePot(old);
+    stagePots.forEach(removeStagePot);
     const mesh = buildPotMesh(r);
-    stagePots = [{ mesh, recipe: { ...r }, spin: IDLE_SPIN, bornAt: performance.now() }, ...stagePots.slice(1)];
+    stagePots = [{ mesh, recipe: { ...r }, spin: IDLE_SPIN, bornAt: performance.now() }];
     stage.add(mesh);
-    layoutStage();
     Object.assign(recipe, r);
     updatePlacard();
     syncUrl();
-  }
-
-  function standCompanion(r: Recipe) {
-    if (stagePots.length >= 3) removeStagePot(stagePots.pop()!);
-    const mesh = buildPotMesh(r);
-    stagePots = [
-      stagePots[0]!,
-      { mesh, recipe: { ...r }, spin: IDLE_SPIN, bornAt: performance.now() },
-      ...stagePots.slice(1),
-    ];
-    stage.add(mesh);
-    layoutStage();
-    clearTableBtn.style.display = "";
-  }
-
-  function clearCompanions() {
-    stagePots.slice(1).forEach(removeStagePot);
-    stagePots = stagePots.slice(0, 1);
-    clearTableBtn.style.display = "none";
   }
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -289,6 +343,8 @@ async function main() {
   let grabbed: StagePot | null = null;
   let lastPointerX = 0;
   let lastDragDelta = 0;
+  /** The grabbed pot's rotation last frame — how loud the wheel is right now. */
+  let grabbedRotation = 0;
 
   function potUnderPointer(event: PointerEvent): StagePot | null {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -309,7 +365,8 @@ async function main() {
     lastPointerX = event.clientX;
     lastDragDelta = 0;
     controls.enabled = false; // the hand is on the pot, not the camera
-    renderer.domElement.style.cursor = "grabbing";
+    setPotGrip("grabbing");
+    clayGrab(); // a palm meeting the damp wall
   });
   renderer.domElement.addEventListener("pointermove", (event) => {
     if (grabbed) {
@@ -318,15 +375,16 @@ async function main() {
       lastDragDelta = delta * 0.011; // px -> radians; tuned to feel 1:1
       grabbed.mesh.rotation.y += lastDragDelta;
     } else {
-      renderer.domElement.style.cursor = potUnderPointer(event) ? "grab" : "";
+      setPotGrip(potUnderPointer(event) ? "over" : "none");
     }
   });
   const releasePot = () => {
     if (!grabbed) return;
     grabbed.spin = lastDragDelta; // the flick: leave with the hand's velocity
+    flickRelease(lastDragDelta); // air off the rim, but only on a real flick
     grabbed = null;
     controls.enabled = true;
-    renderer.domElement.style.cursor = "";
+    setPotGrip("none");
   };
   renderer.domElement.addEventListener("pointerup", releasePot);
   renderer.domElement.addEventListener("pointerleave", releasePot);
@@ -366,7 +424,7 @@ async function main() {
     <div class="grain"></div>
     <i class="tick tl"></i><i class="tick tr"></i><i class="tick bl"></i><i class="tick br"></i>
     <header class="masthead">
-      <h1>Kiln</h1>
+      <h1><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#6F4930"/><path fill="#F4EAD5" d="M 25 11 L 40 10 L 38 15 L 37 20 L 45 26 L 48 35 L 44 47 L 40 51 L 42 56 L 23 57 L 26 51 L 21 46 L 16 34 L 20 25 L 27 19 L 26 14 Z"/></svg>Kiln</h1>
       <p class="tagline">throw · glaze · fire — <em>the kiln decides</em></p>
     </header>
     <div class="panel">
@@ -398,7 +456,6 @@ async function main() {
       <button class="keep" id="keep">keep this pot → shelf</button>
     </div>
     <button class="share" id="share">copy link to this firing</button>
-    <button class="share cleartable" id="clearTable" style="display:none">clear the table</button>
     <button class="share soundtoggle" id="soundToggle">sound ${soundEnabled() ? "on" : "off"}</button>
     <div class="shelf" id="shelf">
       <p class="shelf-label">THE SHELF</p>
@@ -409,11 +466,15 @@ async function main() {
   app.appendChild(renderer.domElement);
   app.appendChild(chrome);
 
+  // The studio cursor. Owns every cursor picture in the app; the only thing the
+  // scene tells it is whether a hand is on a pot (setPotGrip, above). Bails out
+  // on its own for touch and reduced motion, so this call is unconditional.
+  initCursor();
+
   const seedEl = chrome.querySelector<HTMLSpanElement>("#seed")!;
   const bignumEl = chrome.querySelector<HTMLDivElement>("#bignum")!;
   const fireBtn = chrome.querySelector<HTMLButtonElement>("#fire")!;
   const kilnfire = chrome.querySelector<HTMLDivElement>("#kilnfire")!;
-  const clearTableBtn = chrome.querySelector<HTMLButtonElement>("#clearTable")!;
 
   function updatePlacard() {
     chrome.querySelector("#placardTitle")!.textContent = pieceTitle(recipe);
@@ -439,17 +500,17 @@ async function main() {
         <img src="${sketchThumbnail(entry.recipe)}" alt="" title="load onto the pedestal" />
         <p class="shelf-name">${firingLabel(entry.recipe.seed)}</p>
         <div class="shelf-actions">
-          <button title="stand next to the current pot">+table</button>
           <button title="remove from shelf">×</button>
         </div>
       `;
       item.querySelector("img")!.addEventListener("click", () => {
+        shelfLift(); // a dry hand taking it off the board
         setWorkingPot(entry.recipe);
         syncControls();
       });
-      const [standBtn, removeBtn] = item.querySelectorAll("button");
-      standBtn!.addEventListener("click", () => standCompanion(entry.recipe));
+      const removeBtn = item.querySelector("button");
       removeBtn!.addEventListener("click", () => {
+        shelfRemove();
         shelf = shelf.filter((_, i) => i !== index);
         saveShelf(shelf);
         renderShelf();
@@ -464,6 +525,7 @@ async function main() {
       shelf = [...shelf, { recipe: { ...recipe }, savedAt: Date.now() }];
       saveShelf(shelf);
       renderShelf();
+      shelfPlace(); // the knock of a pot set on the wooden shelf board
     }
   });
 
@@ -489,16 +551,20 @@ async function main() {
   }
 
   chrome.querySelector<HTMLSelectElement>("#preset")!.addEventListener("change", (e) => {
+    uiTick("form");
     setWorkingPot({ ...recipe, form: (e.target as HTMLSelectElement).value as PresetName });
   });
   chrome.querySelector<HTMLSelectElement>("#glaze")!.addEventListener("change", (e) => {
+    uiTick("glaze");
     setWorkingPot({ ...recipe, glaze: (e.target as HTMLSelectElement).value as GlazeName });
   });
   chrome.querySelector<HTMLSelectElement>("#atmosphere")!.addEventListener("change", (e) => {
+    uiTick("atmosphere");
     setWorkingPot({ ...recipe, atmosphere: (e.target as HTMLSelectElement).value as Atmosphere });
   });
   chrome.querySelector<HTMLInputElement>("#hold")!.addEventListener("input", (e) => {
     const holdMinutes = Number((e.target as HTMLInputElement).value);
+    dialStep(); // one detent of the kiln controller dial
     chrome.querySelector<HTMLSpanElement>("#holdLabel")!.textContent = `${holdMinutes} min`;
     setWorkingPot({ ...recipe, holdMinutes });
   });
@@ -519,6 +585,7 @@ async function main() {
       kilnfire.classList.add("open");
       kilnfire.classList.remove("dim");
       stopRoar();
+      kilnDoor(); // the latch and the heavy brick door swinging open
       tink(); // the ceramic ring of the pot being set down
     }, 1700);
     setTimeout(() => {
@@ -527,16 +594,18 @@ async function main() {
     }, 3000);
   }
   fireBtn.addEventListener("click", fireKiln);
+  // The one control that gets a hover voice: embers breathing in the firebox.
+  // (If every button whispered, none of them would mean anything.)
+  fireBtn.addEventListener("pointerenter", emberWhisper);
   if (params.get("debug") === "firing") kilnfire.classList.add("dim");
 
   chrome.querySelector<HTMLButtonElement>("#share")!.addEventListener("click", async () => {
     await navigator.clipboard.writeText(location.href);
+    stamp(); // the maker's stamp pressed into leather-hard clay
     const btn = chrome.querySelector<HTMLButtonElement>("#share")!;
     btn.textContent = "copied — same seed, same pot";
     setTimeout(() => (btn.textContent = "copy link to this firing"), 2000);
   });
-  clearTableBtn.addEventListener("click", clearCompanions);
-
   const soundBtn = chrome.querySelector<HTMLButtonElement>("#soundToggle")!;
   soundBtn.addEventListener("click", () => {
     setSoundEnabled(!soundEnabled());
@@ -567,12 +636,22 @@ async function main() {
 
   renderer.setAnimationLoop(() => {
     const now = performance.now();
+    // The wheel's continuous voice: the fastest pot on stage drives it (while a
+    // pot is grabbed, the hand's own velocity does). Silent at idle speed.
+    let fastestSpin = 0;
     stagePots.forEach((pot) => {
       // Spin: while grabbed the hand drives it directly; released spin decays
       // exponentially back to the idle wheel speed (the flick's momentum).
       if (pot !== grabbed) {
         pot.mesh.rotation.y += pot.spin;
         pot.spin += (IDLE_SPIN - pot.spin) * 0.025;
+        fastestSpin = Math.max(fastestSpin, Math.abs(pot.spin));
+      } else {
+        // Hand-driven: the wheel's speed is the rotation it actually gained this
+        // frame, so a hand resting on the pot without moving is silent — which
+        // is exactly what a stopped wheel does.
+        fastestSpin = Math.max(fastestSpin, Math.abs(pot.mesh.rotation.y - grabbedRotation));
+        grabbedRotation = pot.mesh.rotation.y;
       }
       // Entrance: rise out of the pedestal and settle with a slight overshoot.
       const age = (now - pot.bornAt) / ENTRANCE_MS;
@@ -581,10 +660,14 @@ async function main() {
         pot.mesh.position.y = -0.35 * (1 - k);
         pot.mesh.scale.setScalar(0.94 + 0.06 * k);
       } else {
+        // The first frame past the entrance — the scale still being mid-flight is
+        // what marks that edge — is the moment the pot comes to rest.
+        if (pot.mesh.scale.x !== 1) potSettle();
         pot.mesh.position.y = 0;
         pot.mesh.scale.setScalar(1);
       }
     });
+    setSpinRate(fastestSpin);
     // The inspection lamp breathes in when the cursor moves, out when it rests.
     lamp.intensity += (lampTarget - lamp.intensity) * 0.08;
     lampTarget *= 0.985; // no movement -> the lamp is set down again

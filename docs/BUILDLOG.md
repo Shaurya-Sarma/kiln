@@ -224,3 +224,25 @@ rejected: Kiln is an instrument you play, not a page you read). Four additions:
 
 Plus DOM parallax: the giant firing number drifts against the pot as the cursor moves —
 two layers of paper sliding, the cheapest depth cue there is.
+
+## 12. The glaze expansion: firing gets its drama back
+
+User-caught design bug: **celadon ignored the seed** — pooling is geometry-driven and
+its noise was unseeded, so "fire again" on the DEFAULT glaze produced an identical pot.
+The thesis, broken exactly where a first-time visitor tests it. Fix: every glaze now
+consumes the kiln's fingerprint — celadon gets per-firing dip thickness (nobody dips
+identically twice), seeded speckle placement, broad soft dip patches, and a hue drift
+(kiln position). surfaceNoise() gained a seed-derived shift parameter.
+
+Three new glazes, chosen specifically for per-firing variance:
+- **Shino** — the "does what it wants" glaze: seeded orange fire-blushes, grey carbon
+  trapping (reduction smokes; oxidation barely traps), pinholes, and a whole-base
+  toastiness coin-flip. Tuning lesson: a plain radial gradient collapses its alpha so
+  fast the blush reads as a whisper under studio light — hold the colour to mid-radius.
+- **Copper red (oxblood)** — the atmosphere glaze: blood-red with violet flambé veils
+  in reduction, the same copper settling into quiet green in oxidation. Bug found: the
+  rim-break term treated the whole convex belly as a "ridge" and washed it pale — ridge
+  effects need a deadzone (smoothstep threshold) so only true edges break.
+- **Ash** — gravity made visible: seeded rivulets planned as full wander paths (purity
+  rule), stamped as overlapping discs. 26 steps read as a dotted line — no melted glass
+  ever dripped dotted; 72 steps overlap into runs.

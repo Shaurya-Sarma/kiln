@@ -77,6 +77,9 @@ const html = `<!DOCTYPE html>
           <option value="celadon" selected>celadon</option>
           <option value="crystalline">crystalline</option>
           <option value="tenmoku">tenmoku</option>
+          <option value="shino">shino</option>
+          <option value="copper-red">copper red</option>
+          <option value="ash">ash</option>
         </select>
       </label>
       <label>atmosphere

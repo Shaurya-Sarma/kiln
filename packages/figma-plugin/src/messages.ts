@@ -12,7 +12,7 @@
 export type WireProfilePoint = { radius: number; height: number };
 
 export type FiringSettings = {
-  glaze: "celadon" | "crystalline" | "tenmoku";
+  glaze: "celadon" | "crystalline" | "tenmoku" | "shino" | "copper-red" | "ash";
   atmosphere: "oxidation" | "reduction";
   holdMinutes: number;
   seed: number;

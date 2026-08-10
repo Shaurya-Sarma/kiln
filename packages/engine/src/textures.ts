@@ -261,3 +261,254 @@ export function oilSpotTexture({ seed }: OilSpotParams): CanvasTexture {
 
   return toTexture(canvas);
 }
+
+export type SeededGlazeParams = {
+  seed: number;
+  atmosphere: Atmosphere;
+};
+
+/**
+ * Shino: the glaze that does what it wants.
+ *
+ * A thick feldspathic white that blushes orange where flame and soda vapor
+ * found it, and traps grey carbon where reduction smoke got sealed under the
+ * melt. Even experienced potters can't call a shino before opening the kiln —
+ * which makes it the purest expression of this app's thesis. Per firing, the
+ * SEED decides where the blushes bloom and where the carbon got trapped;
+ * reduction firings trap far more carbon than oxidation ones.
+ */
+export function shinoTexture({ seed, atmosphere }: SeededGlazeParams): CanvasTexture {
+  const SIZE = 1024;
+  const { canvas, ctx } = makeCanvas(SIZE);
+  const rand = mulberry32(seed ^ 0x51142);
+
+  // Base: warm feldspar cream — itself a per-firing fact. Some loads come out
+  // milk-white, some toast all over; one lerp on the whole base sells that.
+  const toastiness = rand();
+  const top = toastiness > 0.6 ? "#efd6ae" : "#f2e3c9";
+  const bottom = toastiness > 0.6 ? "#e0b98a" : "#e6cda6";
+  const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
+  grad.addColorStop(0, top);
+  grad.addColorStop(1, bottom);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // Fire blushes: large soft salmon-orange clouds. Plan first, then stamp
+  // (wrap-seam purity rule — see the note above crystallineTexture).
+  const blushes = Array.from({ length: 8 + Math.floor(rand() * 9) }, () => ({
+    x: rand() * SIZE,
+    y: rand() * SIZE,
+    r: SIZE * (0.12 + rand() * 0.26),
+    alpha: 0.4 + rand() * 0.35,
+    warm: rand(), // 0 = salmon, 1 = burnt orange
+  }));
+  for (const blush of blushes) {
+    wrapX(SIZE, blush.x, (x) => {
+      const g = ctx.createRadialGradient(x, blush.y, 0, x, blush.y, blush.r);
+      const tone = blush.warm > 0.5 ? "172,62,22" : "206,106,48";
+      // Hold the colour out to mid-radius before fading — a plain radial
+      // gradient collapses its alpha so fast the blush reads as a whisper
+      // under the studio light (round one of this glaze proved it).
+      g.addColorStop(0, `rgba(${tone},${blush.alpha})`);
+      g.addColorStop(0.55, `rgba(${tone},${blush.alpha * 0.8})`);
+      g.addColorStop(1, `rgba(${tone},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, blush.y, blush.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // Carbon trapping: sooty grey smudges sealed under the melt. Reduction
+  // firings smoke far more; oxidation barely traps at all.
+  const carbonCount = atmosphere === "reduction" ? 3 + Math.floor(rand() * 5) : Math.floor(rand() * 2);
+  const smudges = Array.from({ length: carbonCount }, () => ({
+    x: rand() * SIZE,
+    y: rand() * SIZE,
+    r: SIZE * (0.09 + rand() * 0.18),
+    alpha: 0.18 + rand() * 0.3,
+  }));
+  for (const smudge of smudges) {
+    wrapX(SIZE, smudge.x, (x) => {
+      const g = ctx.createRadialGradient(x, smudge.y, 0, x, smudge.y, smudge.r);
+      g.addColorStop(0, `rgba(74,66,64,${smudge.alpha})`);
+      g.addColorStop(0.5, `rgba(74,66,64,${smudge.alpha * 0.7})`);
+      g.addColorStop(1, "rgba(74,66,64,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, smudge.y, smudge.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // Pinholes: shino's thick coat boils tiny craters into the surface.
+  for (let i = 0; i < 60 + rand() * 60; i++) {
+    const x = rand() * SIZE;
+    const y = rand() * SIZE;
+    const r = 0.8 + rand() * 1.6;
+    const alpha = 0.18 + rand() * 0.25;
+    wrapX(SIZE, x, (sx) => {
+      ctx.fillStyle = `rgba(96,74,58,${alpha})`;
+      ctx.beginPath();
+      ctx.arc(sx, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  return toTexture(canvas);
+}
+
+/**
+ * Copper red (oxblood / flambé) — the atmosphere glaze.
+ *
+ * The SAME copper that gives oxidation firings a quiet green turns blood-red
+ * the moment the kiln is starved of oxygen; that flip is the most dramatic
+ * atmosphere story in ceramics, so this texture renders two entirely
+ * different glazes from one recipe. In reduction, the seed streaks the red
+ * with flambé runs — violet-blue veils where the glaze re-oxidized as it ran.
+ */
+export function copperRedTexture({ seed, atmosphere }: SeededGlazeParams): CanvasTexture {
+  const SIZE = 1024;
+  const { canvas, ctx } = makeCanvas(SIZE);
+  const rand = mulberry32(seed ^ 0xc0bbe4);
+
+  if (atmosphere === "oxidation") {
+    // Copper in oxygen: a soft matte green, gently mottled.
+    const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
+    grad.addColorStop(0, "#a9bd9a");
+    grad.addColorStop(1, "#83a184");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    const patches = Array.from({ length: 180 }, () => ({
+      x: rand() * SIZE,
+      y: rand() * SIZE,
+      r: 10 + rand() * 30,
+      alpha: 0.03 + rand() * 0.05,
+    }));
+    for (const patch of patches) {
+      wrapX(SIZE, patch.x, (x) => {
+        const g = ctx.createRadialGradient(x, patch.y, 0, x, patch.y, patch.r);
+        g.addColorStop(0, `rgba(74,104,74,${patch.alpha})`);
+        g.addColorStop(1, "rgba(74,104,74,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, patch.y, patch.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+    return toTexture(canvas);
+  }
+
+  // Reduction: oxblood. Deep red, darker in the depths, with flambé streaks.
+  const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
+  grad.addColorStop(0, "#8c2420");
+  grad.addColorStop(0.55, "#71191a");
+  grad.addColorStop(1, "#541114");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // Flambé: vertical veils where the melt ran and briefly re-oxidized.
+  // Planned first (purity rule), then stamped with wrap copies.
+  const streaks = Array.from({ length: 7 + Math.floor(rand() * 9) }, () => ({
+    x: rand() * SIZE,
+    top: rand() * SIZE * 0.5,
+    length: SIZE * (0.25 + rand() * 0.5),
+    width: 14 + rand() * 46,
+    drift: (rand() - 0.5) * 60,
+    alpha: 0.1 + rand() * 0.22,
+    cool: rand() > 0.35, // most veils cool to violet-blue; some stay pale
+  }));
+  for (const streak of streaks) {
+    wrapX(SIZE, streak.x, (x) => {
+      const g = ctx.createLinearGradient(x, streak.top, x + streak.drift, streak.top + streak.length);
+      const tone = streak.cool ? "108,88,152" : "196,168,172";
+      g.addColorStop(0, `rgba(${tone},0)`);
+      g.addColorStop(0.45, `rgba(${tone},${streak.alpha})`);
+      g.addColorStop(1, `rgba(${tone},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(
+        x + streak.drift / 2,
+        streak.top + streak.length / 2,
+        streak.width,
+        streak.length / 2,
+        Math.atan2(streak.drift, streak.length),
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    });
+  }
+
+  return toTexture(canvas);
+}
+
+/**
+ * Ash glaze — gravity made visible.
+ *
+ * Wood ash melts into a runny green-amber glass that rivulets down the wall
+ * and gathers wherever it can rest. The drips ARE the glaze: each firing the
+ * seed decides where they start, how far they wander, and where they pool.
+ */
+export function ashTexture({ seed }: SeededGlazeParams): CanvasTexture {
+  const SIZE = 1024;
+  const { canvas, ctx } = makeCanvas(SIZE);
+  const rand = mulberry32(seed ^ 0xa54);
+
+  // Base: thin amber-olive wash, warmer where the coat is thin near the rim.
+  const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
+  grad.addColorStop(0, "#bb9a5c");
+  grad.addColorStop(0.4, "#998c52");
+  grad.addColorStop(1, "#6d7647");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // Rivulets: plan the full wander of every drip before drawing (purity rule).
+  // Canvas y=0 is the rim; drips start high and run DOWN the wall.
+  const drips = Array.from({ length: 10 + Math.floor(rand() * 8) }, () => {
+    const startX = rand() * SIZE;
+    const startY = SIZE * (0.02 + rand() * 0.3);
+    const length = SIZE * (0.25 + rand() * 0.55);
+    // Enough steps that adjacent discs overlap into a continuous run — at 26
+    // steps the discs read as a dotted line, which no melted glass ever did.
+    const steps = 72;
+    let x = startX;
+    const path = Array.from({ length: steps }, (_, i) => {
+      x += (rand() - 0.5) * 5;
+      return {
+        x,
+        y: startY + (length * i) / (steps - 1),
+        width: 5 + (i / steps) * (7 + rand() * 11),
+      };
+    });
+    return { path, alpha: 0.42 + rand() * 0.33, poolR: 12 + rand() * 22 };
+  });
+
+  for (const drip of drips) {
+    const first = drip.path[0]!;
+    wrapX(SIZE, first.x, (wx) => {
+      const dx = wx - first.x;
+      // The drip body: stacked soft discs read as a run of melted glass.
+      for (const p of drip.path) {
+        const g = ctx.createRadialGradient(p.x + dx, p.y, 0, p.x + dx, p.y, p.width);
+        g.addColorStop(0, `rgba(94,112,66,${drip.alpha})`);
+        g.addColorStop(1, "rgba(94,112,66,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(p.x + dx, p.y, p.width, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // The pool where it came to rest — darker, glassier.
+      const last = drip.path[drip.path.length - 1]!;
+      const g = ctx.createRadialGradient(last.x + dx, last.y, 0, last.x + dx, last.y, drip.poolR);
+      g.addColorStop(0, `rgba(64,84,48,${Math.min(drip.alpha + 0.2, 0.6)})`);
+      g.addColorStop(1, "rgba(64,84,48,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(last.x + dx, last.y, drip.poolR, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  return toTexture(canvas);
+}

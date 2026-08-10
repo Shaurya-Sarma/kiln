@@ -14,7 +14,7 @@
 
 import { PRESETS, type Atmosphere, type PresetName, sampleProfile } from "@kiln/engine";
 
-export type GlazeName = "celadon" | "crystalline" | "tenmoku";
+export type GlazeName = "celadon" | "crystalline" | "tenmoku" | "shino" | "copper-red" | "ash";
 
 export type Recipe = {
   form: PresetName;
@@ -52,6 +52,9 @@ const GLAZE_TINTS: Record<GlazeName, { fill: string; ink: string }> = {
   celadon: { fill: "#cfdccc", ink: "#4b6b58" },
   crystalline: { fill: "#dde7ec", ink: "#5d7e93" },
   tenmoku: { fill: "#3a2a1e", ink: "#20150e" },
+  shino: { fill: "#efd9b8", ink: "#b06a3c" },
+  "copper-red": { fill: "#8c2420", ink: "#541114" },
+  ash: { fill: "#a99a5e", ink: "#5e7042" },
 };
 
 /**
