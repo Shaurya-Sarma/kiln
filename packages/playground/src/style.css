@@ -274,3 +274,156 @@ body,
 .kilnfire.dim .ember-label {
   opacity: 1;
 }
+
+/* ---------- The Studio additions ---------- */
+
+/* Canvas above the big number, below all UI chrome. */
+#app canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+}
+
+/* The huge faint firing number BEHIND the (transparent) 3D scene. */
+.bignum {
+  position: fixed;
+  top: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  font-family: "Fraunces Variable", serif;
+  font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 144;
+  font-size: min(34vw, 460px);
+  line-height: 1;
+  color: rgba(43, 33, 24, 0.055);
+  user-select: none;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  background: radial-gradient(130% 100% at 50% 42%, rgba(43, 33, 24, 0) 58%, rgba(43, 33, 24, 0.12) 100%);
+}
+
+/* ---------- museum placard ---------- */
+.placard {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: 240px;
+  padding: 12px 16px 12px;
+  text-align: center;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  box-shadow: 3px 4px 0 rgba(43, 33, 24, 0.06);
+}
+
+.placard-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+  font-variation-settings: "SOFT" 80;
+}
+
+.placard-meta {
+  margin: 4px 0 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.placard .keep {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--brick);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0 0;
+}
+
+.placard .keep:hover {
+  color: var(--brick-deep);
+  text-decoration: underline wavy 1px;
+  text-underline-offset: 3px;
+}
+
+/* ---------- the shelf ---------- */
+.shelf {
+  position: absolute;
+  left: 38px;
+  bottom: 22px;
+  z-index: 20;
+  max-width: min(46vw, 560px);
+}
+
+.shelf-label {
+  margin: 0 0 6px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  color: var(--ink-faint);
+}
+
+.shelf-items {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  /* the shelf plank */
+  border-bottom: 3px solid rgba(107, 93, 79, 0.4);
+}
+
+.shelf-item {
+  flex: none;
+  width: 68px;
+  text-align: center;
+}
+
+.shelf-item img {
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.shelf-item img:hover {
+  transform: translateY(-3px);
+}
+
+.shelf-name {
+  margin: 3px 0 1px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.shelf-actions button {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.5px;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 3px;
+}
+
+.shelf-actions button:hover {
+  color: var(--brick);
+}
+
+.cleartable {
+  bottom: 54px;
+}
