@@ -13,7 +13,7 @@
 
 import { Color, DoubleSide } from "three";
 import { MeshPhysicalNodeMaterial } from "three/webgpu";
-import { attribute, color, float, mix, smoothstep, texture, uv } from "three/tsl";
+import { attribute, color, float, max, min, mix, smoothstep, texture, uv } from "three/tsl";
 import { crystallineTexture, oilSpotTexture } from "./textures.js";
 
 export type Atmosphere = "oxidation" | "reduction";
@@ -55,11 +55,14 @@ export function createCeladonMaterial({ atmosphere }: GlazeParams): MeshPhysical
   // so open forms like bowls show their inside.
   material.side = DoubleSide;
 
-  const pooling = attribute("aPooling", "float");
+  // Explicit generic: the typings widen attribute's inferred node type to
+  // `string`, which unifies with nothing — pinning <"float"> restores the
+  // typed chainable node.
+  const pooling = attribute<"float">("aPooling", "float");
   const v = uv().y; // arc length up the wall: 0 = foot, 1 = rim
 
   // Grooves pool (positive concavity); the foot pools regardless of shape.
-  const grooves = pooling.max(0).mul(0.9);
+  const grooves = max(pooling, 0).mul(0.9);
   const foot = smoothstep(float(0.3), float(0.0), v).mul(0.55);
   const poolAmount = grooves.add(foot).clamp(0, 1);
 
@@ -94,7 +97,7 @@ export function createCrystallineMaterial(params: FiringParams): MeshPhysicalNod
 
   // Slight darkening where the glaze pools — crystalline glazes are runny
   // glass too, and the pooled edge grounds the pot visually.
-  const pooling = attribute("aPooling", "float").max(0).mul(0.25);
+  const pooling = max(attribute<"float">("aPooling", "float"), 0).mul(0.25);
   material.colorNode = mix(blooms.rgb, blooms.rgb.mul(0.72), pooling);
 
   // Crystals sit in a very fluid, high-gloss glaze.
@@ -123,11 +126,11 @@ export function createTenmokuMaterial({ atmosphere, seed }: GlazeParams): MeshPh
   const iron = new Color("#1d1410");
   const rust = atmosphere === "reduction" ? new Color("#8a4a24") : new Color("#a2551d");
 
-  const pooling = attribute("aPooling", "float");
+  const pooling = attribute<"float">("aPooling", "float");
   const v = uv().y;
 
   // Thin glaze = ridges (negative pooling) + the rim itself. Both break to rust.
-  const ridges = pooling.min(0).negate().mul(1.4);
+  const ridges = min(pooling, 0).negate().mul(1.4);
   const rim = smoothstep(float(0.82), float(1.0), v).mul(0.9);
   const breaking = ridges.add(rim).clamp(0, 1);
 

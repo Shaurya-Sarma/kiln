@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "typeRoots": ["./node_modules/@figma"],
+    "types": ["plugin-typings"]
+  },
+  "include": ["src/code.ts", "src/profile-from-figma.ts", "src/messages.ts"]
+}

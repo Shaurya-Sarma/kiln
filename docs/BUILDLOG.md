@@ -102,3 +102,36 @@ The playground keeps full state in the URL (`?form=bottle&glaze=crystalline&
 atmosphere=reduction&hold=75&seed=417`) — a link reproduces the exact pot, because the
 seed replays the randomness. Also the test harness: headless-Chrome screenshots of any
 state without UI automation.
+
+## 8. The Figma plugin: two programs, one typed conversation
+
+A plugin is two programs that can't touch each other's worlds: the **sandbox** (document
+access, no DOM, no rendering) and the **UI iframe** (full browser, no document access).
+Kiln keeps the sandbox thin — read the selected curve, place exported images — and runs
+the whole engine in the iframe. The entire postMessage conversation is written down as
+discriminated unions in `messages.ts`, imported by both sides, so the compiler keeps two
+separately-built programs honest with each other.
+
+- **Pen tool → profile** (`profile-from-figma.ts`): Figma exposes vector geometry as
+  SVG-ish path text (absolute M/L/C/Q/Z only). We flatten béziers, then apply the
+  potter's interpretation: leftmost point = the wheel's axis, y flipped (Figma is
+  y-down), normalized to standard pot height, foot-first. Pure functions — unit-tested
+  in plain Node before ever touching Figma. Unsupported input throws → preset fallback,
+  so the plugin is never unusable.
+- **Exports**: render → canvas readback → PNG bytes → `figma.createImage` → rectangle
+  with an image fill. Every exported pot carries its full firing settings in
+  `setPluginData` plus a "Re-fire in Kiln" relaunch button — a placed render is a live
+  document you can re-open, not a dead image.
+- **Test tiles ×9**: nine seeds of the current setup placed as a grid frame. Potters
+  explore glazes with test-tile grids; designers explore options with variant grids —
+  same artifact, and the reason this is the flagship export.
+- **Honest tradeoff**: the plugin pins the WebGL2 backend (`forceWebGL: true`) because
+  PNG readback must happen in the same task as the render — rock-solid on WebGL2,
+  finicky on WebGPU swapchains. Same TSL materials compile to GLSL automatically; the
+  playground stays WebGPU-first.
+- **Build**: esbuild twice + inline the UI bundle into one HTML file (the iframe has a
+  null origin — no external scripts, three.js and all). Escape `</script>` in the
+  bundle or the inline tag terminates early.
+- **Typing war story**: the UI typecheck (which compiles the engine too) caught TSL
+  errors Vite never surfaced — `attribute()`'s typings widen the node type to `string`.
+  Fix: pin the generic (`attribute<"float">("aPooling", "float")`).
