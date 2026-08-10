@@ -14,7 +14,6 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import {
   ACESFilmicToneMapping,
-  AmbientLight,
   CircleGeometry,
   CylinderGeometry,
   DirectionalLight,
@@ -39,6 +38,7 @@ import {
   firingLabel,
   newFiringSeed,
   sampleProfile,
+  studioEnvironment,
 } from "@kiln/engine";
 import { type GlazeName, type Recipe, type ShelfEntry, loadShelf, saveShelf, sketchThumbnail } from "./shelf.js";
 import "./style.css";
@@ -117,28 +117,79 @@ async function main() {
   const camera = new PerspectiveCamera(35, 1, 0.1, 100);
   camera.position.set(0.4, 1.7, 5.2);
 
-  const key = new DirectionalLight("#fff2e0", 2.4);
+  // Image-based lighting: the pots reflect a procedural studio (engine/studio.ts).
+  // `scene.environment` only feeds the materials — `scene.background` stays null,
+  // so the canvas is still transparent and the page's paper shows through.
+  scene.environment = studioEnvironment(renderer);
+  scene.environmentIntensity = 0.9;
+
+  // The rig on top of the environment is now deliberately thin. Its job is what
+  // an environment map cannot do: cast the contact shadow that sits the pot on
+  // the pedestal, and put one sharp specular on the glaze. Everything soft —
+  // ambient fill, the sheen down the shoulder, the vertical highlight streaks —
+  // comes from the studio, which is why the old AmbientLight is gone: it was
+  // flattening the very contrast that makes a glaze look wet.
+  const key = new DirectionalLight("#fff2e0", 1.35);
   key.position.set(4, 7, 5);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
   key.shadow.radius = 8;
-  const fill = new DirectionalLight("#dfe4f0", 0.6);
-  fill.position.set(-5, 3, 2);
-  const rim = new DirectionalLight("#ffffff", 1.1);
-  rim.position.set(-2, 4, -6);
-  scene.add(key, fill, rim, new AmbientLight("#e8e4f0", 0.4));
+  // A directional light's shadow camera defaults to a 10x10 box, but the whole
+  // exhibit is about 4 units across — so nearly all of those 2048 texels were
+  // being spent on empty space. Cropping the frustum to the stage is free
+  // resolution, and it is what turns the contact shadow under the foot from a
+  // grey smudge into an actual ring.
+  key.shadow.camera.left = -2.6;
+  key.shadow.camera.right = 2.6;
+  key.shadow.camera.top = 3.4;
+  key.shadow.camera.bottom = -1.4;
+  key.shadow.camera.near = 1;
+  key.shadow.camera.far = 16;
+  // Offset shadow lookups along the surface normal. Needed because the foot pad
+  // and the pedestal top touch: a depth comparison between two surfaces at the
+  // same depth goes either way per texel, which is what stipples a contact edge.
+  key.shadow.normalBias = 0.045;
 
-  // The exhibit stage: a plaster pedestal on a paper-toned floor disc.
+  // The studio's overhead softbox is the largest source in the environment, but
+  // an environment map cannot cast a shadow — so there was nothing dark directly
+  // beneath the pot and it read as pasted onto the plinth rather than standing
+  // on it. This light stands in for that softbox: nearly overhead, dim, heavily
+  // blurred, and its real job is the pool of occlusion inside the foot ring.
+  const overhead = new DirectionalLight("#fff4e6", 0.55);
+  overhead.position.set(0.5, 9, 1.2);
+  overhead.castShadow = true;
+  overhead.shadow.mapSize.set(1024, 1024);
+  overhead.shadow.radius = 14;
+  overhead.shadow.camera.left = -2.6;
+  overhead.shadow.camera.right = 2.6;
+  overhead.shadow.camera.top = 2.6;
+  overhead.shadow.camera.bottom = -2.6;
+  overhead.shadow.camera.near = 1;
+  overhead.shadow.camera.far = 16;
+  overhead.shadow.normalBias = 0.03;
+
+  const fill = new DirectionalLight("#dfe4f0", 0.25);
+  fill.position.set(-5, 3, 2);
+  const rim = new DirectionalLight("#ffffff", 0.5);
+  rim.position.set(-2, 4, -6);
+  scene.add(key, overhead, fill, rim);
+
+  // The exhibit stage: a plaster pedestal on a paper-toned floor disc. Both are
+  // pitched a step DARKER than the page's paper on purpose. They used to be the
+  // same value, which was invisible until the environment map arrived and the
+  // rig came down — at which point the pedestal dissolved into the background
+  // and left the pot floating. A plinth only does its job if its silhouette
+  // reads against the wall behind it.
   const PEDESTAL_TOP = 0;
   const pedestal = new Mesh(
     new CylinderGeometry(1.15, 1.2, 1.1, 64),
-    new MeshStandardMaterial({ color: "#e9e2d6", roughness: 0.92 }),
+    new MeshStandardMaterial({ color: "#d8cebc", roughness: 0.88 }),
   );
   pedestal.position.y = PEDESTAL_TOP - 0.55;
   pedestal.castShadow = pedestal.receiveShadow = true;
   const floor = new Mesh(
     new CircleGeometry(30).rotateX(-Math.PI / 2),
-    new MeshStandardMaterial({ color: "#ece6db", roughness: 0.96 }),
+    new MeshStandardMaterial({ color: "#e0d8ca", roughness: 0.96 }),
   );
   floor.position.y = PEDESTAL_TOP - 1.1;
   floor.receiveShadow = true;
@@ -146,7 +197,11 @@ async function main() {
 
   // ---------- pots on stage (index 0 = the working pot; 1..2 = companions) ----------
   const stage = new Group();
-  stage.position.y = PEDESTAL_TOP;
+  // A hair above the pedestal, not exactly on it. The pots stand on a trimmed
+  // foot ring whose contact pad is dead flat at y = 0, which would be coplanar
+  // with the pedestal's top face and z-fight along the silhouette. Well under a
+  // pixel of separation, and the shadow still lands where the foot is.
+  stage.position.y = PEDESTAL_TOP + 0.004;
   scene.add(stage);
   const STAND_X = [0, -1.55, 1.55];
 

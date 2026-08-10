@@ -1,5 +1,6 @@
-export { sampleProfile } from "./profile.js";
-export type { Profile, ProfilePoint, SampledProfile } from "./profile.js";
+export { sampleProfile, finishProfile } from "./profile.js";
+export type { FinishOptions, Profile, ProfilePoint, SampledProfile } from "./profile.js";
+export { studioEnvironment } from "./studio.js";
 export { buildPotGeometry } from "./pot.js";
 export type { PotGeometryOptions } from "./pot.js";
 export { mulberry32, newFiringSeed, firingLabel } from "./rng.js";

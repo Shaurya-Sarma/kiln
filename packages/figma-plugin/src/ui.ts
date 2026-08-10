@@ -16,7 +16,6 @@
 
 import {
   ACESFilmicToneMapping,
-  AmbientLight,
   CircleGeometry,
   Color,
   DirectionalLight,
@@ -39,6 +38,7 @@ import {
   firingLabel,
   newFiringSeed,
   sampleProfile,
+  studioEnvironment,
 } from "@kiln/engine";
 import type { FiringSettings, SandboxMessage, UiMessage } from "./messages.js";
 
@@ -80,16 +80,25 @@ async function main() {
   const camera = new PerspectiveCamera(35, 1, 0.1, 100);
   camera.position.set(0, 1.6, 4.6);
 
-  const key = new DirectionalLight("#fff2e0", 2.4);
+  // Same procedural studio the playground uses, for the same reason: the glazes
+  // get their glassiness from what they reflect, and the engine's materials are
+  // balanced against this environment. Sharing it is what keeps an exported test
+  // tile looking like the pot on the site. Also the proof that the environment is
+  // backend-agnostic — PMREM generation runs here on WebGL2 (forceWebGL above).
+  scene.environment = studioEnvironment(renderer);
+  scene.environmentIntensity = 0.9;
+
+  const key = new DirectionalLight("#fff2e0", 1.35);
   key.position.set(4, 7, 5);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   key.shadow.radius = 8;
-  const fill = new DirectionalLight("#dfe4f0", 0.6);
+  key.shadow.normalBias = 0.045;
+  const fill = new DirectionalLight("#dfe4f0", 0.25);
   fill.position.set(-5, 3, 2);
-  const rim = new DirectionalLight("#ffffff", 1.1);
+  const rim = new DirectionalLight("#ffffff", 0.5);
   rim.position.set(-2, 4, -6);
-  scene.add(key, fill, rim, new AmbientLight("#e8e4f0", 0.35));
+  scene.add(key, fill, rim);
 
   const ground = new Mesh(
     new CircleGeometry(30).rotateX(-Math.PI / 2),

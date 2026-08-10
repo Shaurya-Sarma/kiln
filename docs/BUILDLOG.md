@@ -156,3 +156,48 @@ and slightly imperfect) + IBM Plex Mono; warm paper, clay-ink brown (never pure 
 kiln-brick red; SVG-turbulence paper grain over everything. Fonts self-hosted via
 Fontsource — no CDN, which also keeps them working inside the plugin's null-origin
 iframe. Glyph gotcha: Plex Mono lacks "№" (U+2116) — firing labels use "no." instead.
+
+## 10. The render-quality pass (agent-assisted): light, thickness, physics
+
+A dedicated investigation into why the pots read as "painted plastic," yielding four
+fixes that each carry a lesson:
+
+1. **Image-based lighting was missing entirely** (`engine/src/studio.ts`, new). A bare
+   directional light is an infinitely small source — a clearcoat at 1.0 had nothing to
+   mirror but two hard dots. The fix is a procedural photographic studio (emissive
+   panels pre-filtered with PMREMGenerator, which three r185 exports for the WebGPU
+   path): an overhead softbox, two vertical strip lights (a tall narrow source smeared
+   around a cylinder becomes THE long vertical highlight that reads as "wet"), a cool
+   rear panel for edge separation, a warm floor bounce — and, non-obviously, **warm
+   near-black walls**. A first pass with tasteful grey walls blew the celadon out to
+   white: a wide dim source delivers more total light than a narrow bright one. Glass
+   reads as glass because of CONTRAST in the reflection, not brightness. Procedural
+   (not a fetched HDR) because the plugin iframe has no network. `scene.environment`
+   and `scene.background` are independent — IBL works fine over a transparent canvas.
+2. **The rim was a paper edge** (`profile.ts` finishing pass). A lathe surface has zero
+   thickness — the one giveaway that a pot is a spun curve, not a vessel. `finishProfile`
+   now rolls the rim (carries the surface over the lip in a semicircular cap one
+   wall-thickness across, then tapers back down the inside to a hairline) and trims a
+   foot ring (hollowed underside + contact ring). Both are pure profile transforms, so
+   arc-length uv and pooling are *recomputed*, not inherited — and the rim cap authors
+   its own pooling (max-negative at the crown), which means tenmoku now breaks to rust
+   exactly on the lip out of geometry rather than a hardcoded band.
+3. **Glaze color now follows light path length** (`glazes.ts`). A glaze is translucent
+   glass over pale clay: light dives in, bounces off the body, comes back. Path length
+   grows with viewing angle (secant falloff) — why real celadon is pale face-on and
+   jade at the silhouette, and why potters tilt a pot to judge a glaze. Implemented as
+   Beer–Lambert absorption over (applied coat + pooling) × view-path multiplier. Plus:
+   orange-peel clearcoat-roughness variation (a perfectly uniform clearcoat is the look
+   of a 3D render), clay-body speckle through thin glaze, and satin oil spots on
+   tenmoku (iron crystals scatter where glass reflects).
+4. **Two real bugs found on the way**: `aPooling` was snapped to the nearest profile
+   sample (`Math.round`), quantizing color into faint contour rings — now interpolated;
+   and coplanar foot/pedestal surfaces stippled shadow acne along every pot's base —
+   fixed with `shadow.normalBias` + a 4mm stage lift, and the shadow camera cropped
+   from its default 10×10 box to the 4-unit stage (free shadow resolution).
+
+Also verified explicitly: the whole stack (PMREM, fresnel/absorption nodes, MaterialX
+noise) renders pixel-equivalent under `forceWebGL: true` — the plugin's backend.
+Cost note: the rim cap sets a sample-density floor (~350 profile points, ~86k triangles
+per pot). Fine for this scene; if the 3×3 test-tile export ever drags, the honest lever
+is radialSegments, not profile density (the rim needs it).
