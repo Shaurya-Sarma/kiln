@@ -607,7 +607,6 @@ body,
   border: none;
   letter-spacing: 0;
   text-indent: 0;
-  cursor: pointer;
 }
 
 .panel .recipe-title button:hover {

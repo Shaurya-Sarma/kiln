@@ -21,45 +21,36 @@
    class is added by cursor.ts, which bails out on touch and reduced-motion.
    That ordering is the whole guardrail: if the system is off, the browser's
    own cursor is untouched. */
+/* !important is deliberate and load-bearing: cc-on is a MODE, and a mode must
+   beat every per-element `cursor: pointer/wait/…` that style.css declares now
+   or anyone adds later. Without it, each new button restarts the same
+   specificity fight (it happened three times in one night — FIRE, the shelf
+   thumbnails, then the recipe card's own minimize button). Element styles
+   keep their cursors for the fallback case (touch / reduced-motion), where
+   cc-on is never added and the browser's cursor is untouched. */
 html.cc-on,
 html.cc-on * {
-  cursor: none;
+  cursor: none !important;
 }
 
 /* ...except where a custom follower actively breaks the control. A <select>
    popup and a range thumb are drawn and driven by the OS; a lagging icon
    next to them reads as "this widget is broken". They keep real cursors —
    and cursor.ts hides the follower there (the "native" state), so exactly
-   one cursor is visible at any time. */
+   one cursor is visible at any time. (Same !important tier, declared later,
+   more specific — they win over the global none.) */
 html.cc-on select,
 html.cc-on select * {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 html.cc-on input[type="range"] {
-  cursor: ew-resize;
+  cursor: ew-resize !important;
 }
 
-html.cc-on input,
+html.cc-on input:not([type="range"]),
 html.cc-on textarea {
-  cursor: auto;
-}
-
-/* Buttons, links, and thumbnails must NOT keep native cursors — but style.css
-   sets `cursor: pointer` on them at the same specificity as our global
-   `html.cc-on *` rule, and style.css is bundled later, so it was winning the
-   tie. One extra element in the selector settles it. */
-html.cc-on button,
-html.cc-on a,
-html.cc-on img,
-html.cc-on label {
-  cursor: none;
-}
-
-/* The FIRE button while disabled (mid-firing) had `cursor: wait` at higher
-   specificity than everything above. The follower owns that moment too. */
-html.cc-on button:disabled {
-  cursor: none;
+  cursor: auto !important;
 }
 
 /* ---------- the follower ---------- */
