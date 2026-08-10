@@ -26,16 +26,39 @@ html.cc-on * {
   cursor: none;
 }
 
-/* The original build kept native cursors on <select> and range inputs as a
-   usability guard (their popups/thumbs are OS-drawn). The user overruled it:
-   the follower rides everywhere, one cursor language across the whole page.
-   (An OS-drawn <select> popup still shows the system cursor while open —
-   the browser owns that surface and CSS cannot reach it.) */
+/* ...except where a custom follower actively breaks the control. A <select>
+   popup and a range thumb are drawn and driven by the OS; a lagging icon
+   next to them reads as "this widget is broken". They keep real cursors —
+   and cursor.ts hides the follower there (the "native" state), so exactly
+   one cursor is visible at any time. */
 html.cc-on select,
-html.cc-on select *,
-html.cc-on input[type="range"],
+html.cc-on select * {
+  cursor: pointer;
+}
+
+html.cc-on input[type="range"] {
+  cursor: ew-resize;
+}
+
 html.cc-on input,
 html.cc-on textarea {
+  cursor: auto;
+}
+
+/* Buttons, links, and thumbnails must NOT keep native cursors — but style.css
+   sets `cursor: pointer` on them at the same specificity as our global
+   `html.cc-on *` rule, and style.css is bundled later, so it was winning the
+   tie. One extra element in the selector settles it. */
+html.cc-on button,
+html.cc-on a,
+html.cc-on img,
+html.cc-on label {
+  cursor: none;
+}
+
+/* The FIRE button while disabled (mid-firing) had `cursor: wait` at higher
+   specificity than everything above. The follower owns that moment too. */
+html.cc-on button:disabled {
   cursor: none;
 }
 
