@@ -776,3 +776,116 @@ body,
     max-width: calc(100vw - 32px);
   }
 }
+
+/* ---------- the plugin teaser ----------
+   Kiln also runs inside Figma itself. A chip in the quiet top-right corner
+   opens a small theater — visitors shouldn't have to leave the studio to
+   see the plugin working. */
+.plugin-chip {
+  position: absolute;
+  top: 38px;
+  right: 38px;
+  z-index: 20;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.plugin-chip::after {
+  content: "";
+  display: block;
+  height: 5px;
+  margin-top: 2px;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  opacity: 0;
+  transition: opacity 0.15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 6' preserveAspectRatio='none'%3E%3Cpath d='M2 4 C 20 1.5, 45 5, 62 3 S 100 2, 118 3.5' fill='none' stroke='%23b0492e' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.plugin-chip:hover::after {
+  opacity: 1;
+}
+
+.theater {
+  position: fixed;
+  inset: 0;
+  z-index: 60; /* above the grain (40) and the kiln door (50) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(43, 33, 24, 0.55);
+}
+
+.theater[hidden] {
+  display: none;
+}
+
+.theater-card {
+  width: min(920px, calc(100vw - 48px));
+  background: var(--paper-raised);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 16px 18px 13px;
+  box-shadow: 0 24px 60px rgba(43, 33, 24, 0.35);
+}
+
+.theater-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 12px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.theater-title button {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.theater-title button:hover {
+  color: var(--brick);
+}
+
+.theater-card video {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  background: var(--ink);
+}
+
+.theater-note {
+  margin: 10px 2px 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 720px) {
+  /* Joins the right-edge utility stack, below sound. */
+  .plugin-chip {
+    top: 76px;
+    right: 16px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+}

@@ -513,6 +513,14 @@ async function main() {
       made by <a href="https://shaux.dev" target="_blank" rel="noopener">shaurya sarma</a>
       · <a href="https://github.com/Shaurya-Sarma/kiln" target="_blank" rel="noopener">github</a>
     </p>
+    <button class="plugin-chip" id="pluginChip">also a figma plugin — watch</button>
+    <div class="theater" id="theater" hidden>
+      <div class="theater-card">
+        <p class="theater-title"><span>KILN, INSTALLED IN FIGMA</span><button id="theaterClose" title="close">×</button></p>
+        <video id="theaterVideo" src="/plugin-demo.mp4" controls playsinline preload="none"></video>
+        <p class="theater-note">draw a profile with the pen tool, fire it in the plugin, and the pot lands back on the canvas — recipe attached, ready to re-fire. rough studio cut.</p>
+      </div>
+    </div>
     <div class="shelf" id="shelf">
       <p class="shelf-label">THE SHELF</p>
       <div class="shelf-items" id="shelfItems"></div>
@@ -713,6 +721,26 @@ async function main() {
     setSoundEnabled(!soundEnabled());
     soundBtn.textContent = `sound ${soundEnabled() ? "on" : "off"}`;
     if (soundEnabled()) tink(); // instant proof it's on
+  });
+
+  // Kiln's other life: installed in Figma. The chip opens a small theater
+  // instead of sending visitors away mid-firing; the video only loads if asked.
+  const theater = chrome.querySelector<HTMLDivElement>("#theater")!;
+  const theaterVideo = chrome.querySelector<HTMLVideoElement>("#theaterVideo")!;
+  const closeTheater = () => {
+    theater.hidden = true;
+    theaterVideo.pause();
+  };
+  chrome.querySelector<HTMLButtonElement>("#pluginChip")!.addEventListener("click", () => {
+    theater.hidden = false;
+    void theaterVideo.play();
+  });
+  chrome.querySelector<HTMLButtonElement>("#theaterClose")!.addEventListener("click", closeTheater);
+  theater.addEventListener("click", (event) => {
+    if (event.target === theater) closeTheater(); // the backdrop is a door
+  });
+  addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !theater.hidden) closeTheater();
   });
 
   // ---------- resize + render loop ----------
